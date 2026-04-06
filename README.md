@@ -13,6 +13,8 @@ Growing Seeds is a lightweight browser prototype for a pass-and-play plant growt
 
 Open `index.html` in a browser.
 
+Try it yourself: [https://github.com/ericop/growing-seeds.git](https://github.com/ericop/growing-seeds.git)
+
 ## How to Play
 
 1. Choose 2 to 5 players from the title screen.
