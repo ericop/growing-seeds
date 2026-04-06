@@ -18,24 +18,36 @@ Play online: <a href="https://ericop.github.io/growing-seeds/">Try the game your
 ## How to Play
 
 1. Choose 2 to 5 players from the title screen.
-2. Each player's first turn is spent placing their free seed hub.
-3. On later turns, choose one action:
+2. Choose either the Starter Set or Advanced Set, then draft 3 DNA modules per player.
+3. Each player's first turn is spent placing their free seed hub.
+4. On later turns, choose one action:
    - Plant Seed
    - Grow
    - Harvest
    - End Turn
-4. Play continues for up to 10 rounds, or until the board is mostly full.
+5. Play continues for up to 10 rounds, or until the board is mostly full.
+
+## Rule Book
+
+- Starter Set is the default mode. It uses the 12 learning-friendly DNA modules every game.
+- Advanced Set samples 12 modules from the full 24-module pool, then players draft from that shared menu.
+- Each player drafts 3 DNA modules. Those modules define auto-growth, produce bonuses, interaction effects, and end-game scoring.
+- The board now supports simplified vertical growth. Columns can hold multiple plant layers, with a normal height cap of 2 unless modules change it.
+- Only the visible top hex in each column counts for most area scoring. Covered lower layers matter mainly for special DNA effects such as Shade Tolerant.
+- End-game scoring is fast: 1 point per visible top hex, plus stored produce, plus DNA module bonuses.
+- Turn flow is simple: start-turn effects, one main action, resolve DNA effects, then auto-growth up to a cap of 2 per turn.
+- The prototype is tuned for a full playtest to land around 45 minutes.
 
 ## Rules Snapshot
 
 - Seed hubs are the base of a player's plant network.
-- Growth must expand into an adjacent empty hex.
+- Growth expands into adjacent columns and can also stack vertically.
 - Extra seed hubs cost 2 produce and must connect to your existing plants.
 - Rocky terrain costs 1 produce to grow into.
 - Thorny terrain harvests for 0.
 - Dry terrain cannot be grown into during drought rounds.
 - Fertile terrain gives stronger harvests and gets even better during rain.
-- Score is based on controlled spaces, stored produce, and connected cluster bonuses.
+- Score is based on visible top hexes, stored produce, and DNA module bonuses.
 
 ## Controls
 
