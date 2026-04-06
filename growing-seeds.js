@@ -1622,9 +1622,13 @@ function drawDNAModuleTile(moduleId, x, y, compact = false) {
   drawText(abbreviation, x, y, compact ? 8 : 9, "#fff8ea", "center", "700");
 }
 
-function drawDNAModuleCluster(player, x, y) {
+function drawDNAModuleCluster(player, x, y, compact = false) {
   if (!player || player.modules.length === 0) return;
-  const positions = [
+  const positions = compact ? [
+    { x, y: y - 8 },
+    { x: x - 13, y: y + 6 },
+    { x: x + 13, y: y + 6 },
+  ] : [
     { x, y: y - 12 },
     { x: x - 18, y: y + 9 },
     { x: x + 18, y: y + 9 },
@@ -1632,7 +1636,7 @@ function drawDNAModuleCluster(player, x, y) {
 
   player.modules.forEach((moduleId, index) => {
     const pos = positions[index] || { x: x + index * 20, y };
-    drawDNAModuleTile(moduleId, pos.x, pos.y, false);
+    drawDNAModuleTile(moduleId, pos.x, pos.y, compact);
   });
 }
 
@@ -1808,14 +1812,13 @@ function drawCompactScoreboard() {
     drawText(`${entry.name}: ${entry.produce}P ${entry.score}VP`, PANEL_X + 24, y, 9, "#3f301d", "left", "600");
   });
 
-  drawText("Show Your DNA Modules", PANEL_X + 10, 160, 12, "#4a371e", "left", "700");
-  drawDNAModuleCluster(player, PANEL_X + 62, 177);
+  drawText("Show Your DNA Modules", PANEL_X + 10, 154, 11, "#4a371e", "left", "700");
+  drawDNAModuleCluster(player, PANEL_X + 42, 170, true);
 
   player.modules.forEach((moduleId, index) => {
     const definition = moduleDef(moduleId);
-    const y = 165 + index * 11;
-    drawText(definition.name, PANEL_X + 112, y, 9, MODULE_TYPE_COLORS[definition.type], "left", "700");
-    drawText(definition.short, PANEL_X + 112, y + 9, 8, "#5a482e", "left", "500");
+    const y = 162 + index * 9;
+    drawText(`${definition.name}: ${definition.short}`, PANEL_X + 78, y, 8, MODULE_TYPE_COLORS[definition.type], "left", "700");
   });
 }
 
