@@ -10,6 +10,7 @@ const HEIGHT = canvas.height;
 const ASPECT = WIDTH / HEIGHT;
 const MAX_ROUNDS = 10;
 const AUTO_GROWTH_LIMIT = 2;
+const PLAYER_NAME_STORAGE_KEY = "growing-seeds-player-names";
 
 const BOARD = {
   cols: 9,
@@ -99,8 +100,8 @@ const MODULES = {
     id: "creepingCarpet",
     name: "Creeping Carpet",
     type: "growth",
-    short: "Stay at height 1, gain extra spread.",
-    detail: "Your plant cannot increase height above 1. In exchange, whenever you take a grow action, you may make 1 extra horizontal growth if legal.",
+    short: "Max height 1; grow gets +1 horizontal spread.",
+    detail: "Your plant stays at height 1. Whenever you take a grow action, you may make 1 extra horizontal growth if legal.",
   },
   tallStalk: {
     id: "tallStalk",
@@ -283,10 +284,44 @@ const ADVANCED_EXTRA_MODULE_IDS = [
 
 const ADVANCED_POOL_IDS = STARTER_MODULE_IDS.concat(ADVANCED_EXTRA_MODULE_IDS);
 
+function defaultPlayerNames() {
+  return Array.from({ length: 5 }, (_, index) => `Player ${index + 1}`);
+}
+
+function loadSavedPlayerNames() {
+  const defaults = defaultPlayerNames();
+
+  try {
+    const raw = window.localStorage.getItem(PLAYER_NAME_STORAGE_KEY);
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return defaults;
+
+    return defaults.map((fallback, index) => {
+      const candidate = typeof parsed[index] === "string" ? parsed[index].trim() : "";
+      return candidate || fallback;
+    });
+  } catch (error) {
+    return defaults;
+  }
+}
+
+function savePlayerNamesToStorage(names) {
+  try {
+    window.localStorage.setItem(PLAYER_NAME_STORAGE_KEY, JSON.stringify(names));
+  } catch (error) {
+    // Keep the editor functional even if local storage is unavailable.
+  }
+}
+
 const game = {
   screen: "menu",
   playerCount: 2,
   gameMode: GAME_MODES.starter,
+  savedPlayerNames: loadSavedPlayerNames(),
+  nameEditorNames: [],
+  editingNameIndex: 0,
+  showScores: false,
   board: [],
   boardMap: new Map(),
   players: [],
@@ -305,6 +340,10 @@ const game = {
   finalBreakdowns: [],
   draftIndex: 0,
   nextUnitId: 1,
+  passPrompt: {
+    active: false,
+    playerId: 0,
+  },
   turnState: {
     mainAction: null,
     growRemaining: 0,
@@ -1103,7 +1142,7 @@ function finishGame() {
 function makePlayers(count) {
   return Array.from({ length: count }, (_, index) => ({
     id: index,
-    name: `Player ${index + 1}`,
+    name: game.savedPlayerNames[index] || `Player ${index + 1}`,
     color: PLAYER_COLORS[index],
     produce: 0,
     score: 0,
@@ -1133,7 +1172,11 @@ function beginDraft() {
   game.winnerText = "";
   game.finalBreakdowns = [];
   game.screen = "draft";
-  game.message = `${currentPlayer().name}: draft the first DNA module.`;
+  game.passPrompt = {
+    active: true,
+    playerId: game.currentPlayer,
+  };
+  game.message = `${currentPlayer().name}, pass the device and press OK to begin drafting.`;
 }
 
 function startGameFromDraft() {
@@ -1145,6 +1188,10 @@ function startGameFromDraft() {
   game.hoverModuleId = null;
   game.lastAction = "DNA draft complete.";
   game.nextUnitId = 1;
+  game.passPrompt = {
+    active: false,
+    playerId: 0,
+  };
   buildBoard();
   game.screen = "play";
   prepareTurn(currentPlayer());
@@ -1162,7 +1209,11 @@ function draftModule(moduleId) {
   }
 
   game.currentPlayer = game.draftIndex % game.playerCount;
-  game.message = `${currentPlayer().name}: draft module ${currentPlayer().modules.length + 1} of 3.`;
+  game.passPrompt = {
+    active: true,
+    playerId: game.currentPlayer,
+  };
+  game.message = `${currentPlayer().name}, pass the device and press OK for the next draft pick.`;
 }
 
 function prepareTurn(player) {
@@ -1194,6 +1245,10 @@ function prepareTurn(player) {
   }
 
   game.selectedAction = forcedSeedTurn(player) ? ACTIONS.plant : null;
+  game.passPrompt = {
+    active: true,
+    playerId: player.id,
+  };
   recomputeScores();
 
   const base = forcedSeedTurn(player)
@@ -1271,32 +1326,47 @@ function refreshButtons() {
       buttons.push(makeButton(182 + index * 108, 174, 88, 34, `${count} Players`, `players:${count}`, true, game.playerCount === count));
     });
 
+    buttons.push(makeButton(614, 174, 148, 34, "Change Names", "openNames"));
     buttons.push(makeButton(300, 222, 200, 38, "Begin DNA Draft", "beginDraft"));
+  }
+
+  if (game.screen === "names") {
+    buttons.push(fullButton);
+    for (let index = 0; index < 5; index += 1) {
+      buttons.push(makeButton(170, 72 + index * 32, 460, 26, game.nameEditorNames[index] || "", `nameField:${index}`, true, game.editingNameIndex === index));
+    }
+    buttons.push(makeButton(172, 244, 140, 32, "Back", "cancelNames"));
+    buttons.push(makeButton(330, 244, 140, 32, "Reset", "resetNames"));
+    buttons.push(makeButton(488, 244, 140, 32, "Save Names", "saveNames"));
   }
 
   if (game.screen === "draft") {
     buttons.push(makeButton(638, 10, 108, 22, "Menu", "menu"));
     buttons.push(fullButton);
 
-    const columns = 3;
-    game.availableModules.forEach((moduleId, index) => {
-      const col = index % columns;
-      const row = Math.floor(index / columns);
-      const definition = moduleDef(moduleId);
-      buttons.push(
-        makeButton(
-          20 + col * 152,
-          70 + row * 42,
-          144,
-          36,
-          definition.name,
-          `draft:${moduleId}`,
-          true,
-          false,
-          definition.type,
-        ),
-      );
-    });
+    if (game.passPrompt.active) {
+      buttons.push(makeButton(330, 152, 140, 34, "OK", "handoffOk"));
+    } else {
+      const columns = 3;
+      game.availableModules.forEach((moduleId, index) => {
+        const col = index % columns;
+        const row = Math.floor(index / columns);
+        const definition = moduleDef(moduleId);
+        buttons.push(
+          makeButton(
+            20 + col * 152,
+            70 + row * 42,
+            144,
+            36,
+            definition.name,
+            `draft:${moduleId}`,
+            true,
+            false,
+            definition.type,
+          ),
+        );
+      });
+    }
   }
 
   if (game.screen === "play") {
@@ -1307,12 +1377,19 @@ function refreshButtons() {
     const canHarvest = getVisibleHexCount(player.id) > 0;
     const growPreview = calculateManualGrowPlan(player);
 
-    buttons.push(makeButton(638, 10, 108, 22, "New Game", "menu"));
-    buttons.push(fullButton);
-    buttons.push(makeButton(PANEL_X + 10, 194, 132, 22, mustPlant ? "Plant First Seed" : "Plant Seed", ACTIONS.plant, canPlant, game.selectedAction === ACTIONS.plant));
-    buttons.push(makeButton(PANEL_X + 148, 194, 132, 22, `Grow x${growPreview.steps}`, ACTIONS.grow, !mustPlant && canGrow, game.selectedAction === ACTIONS.grow));
-    buttons.push(makeButton(PANEL_X + 10, 220, 132, 22, "Harvest", ACTIONS.harvest, !mustPlant && canHarvest));
-    buttons.push(makeButton(PANEL_X + 148, 220, 132, 22, game.turnState.mainAction === ACTIONS.grow && game.turnState.growSpent > 0 ? "Finish Grow" : "End Turn", ACTIONS.end, !mustPlant || (game.turnState.mainAction === ACTIONS.grow && game.turnState.growSpent > 0)));
+    if (game.passPrompt.active) {
+      buttons.push(makeButton(16, 10, 82, 22, game.showScores ? "V Score" : "> Score", "toggleScores"));
+      buttons.push(fullButton);
+      buttons.push(makeButton(330, 152, 140, 34, "OK", "handoffOk"));
+    } else {
+      buttons.push(makeButton(638, 10, 108, 22, "New Game", "menu"));
+      buttons.push(makeButton(16, 10, 82, 22, game.showScores ? "V Score" : "> Score", "toggleScores"));
+      buttons.push(fullButton);
+      buttons.push(makeButton(PANEL_X + 10, 194, 132, 22, mustPlant ? "Plant First Seed" : "Plant Seed", ACTIONS.plant, canPlant, game.selectedAction === ACTIONS.plant));
+      buttons.push(makeButton(PANEL_X + 148, 194, 132, 22, `Grow x${growPreview.steps}`, ACTIONS.grow, !mustPlant && canGrow, game.selectedAction === ACTIONS.grow));
+      buttons.push(makeButton(PANEL_X + 10, 220, 132, 22, "Harvest", ACTIONS.harvest, !mustPlant && canHarvest));
+      buttons.push(makeButton(PANEL_X + 148, 220, 132, 22, game.turnState.mainAction === ACTIONS.grow && game.turnState.growSpent > 0 ? "Finish Grow" : "End Turn", ACTIONS.end, !mustPlant || (game.turnState.mainAction === ACTIONS.grow && game.turnState.growSpent > 0)));
+    }
   }
 
   if (game.screen === "end") {
@@ -1332,6 +1409,26 @@ function handleButton(button) {
     return;
   }
 
+  if (button.action === "toggleScores") {
+    game.showScores = !game.showScores;
+    game.message = game.showScores
+      ? "Player scores are shown above the board."
+      : "Player scores are hidden to keep the board clear.";
+    return;
+  }
+
+  if (button.action === "handoffOk") {
+    game.passPrompt.active = false;
+    if (game.screen === "draft") {
+      game.message = `${currentPlayer().name}: draft module ${currentPlayer().modules.length + 1} of 3.`;
+    } else {
+      game.message = forcedSeedTurn(currentPlayer())
+        ? `${currentPlayer().name}: place your first seed hub.`
+        : `${currentPlayer().name}'s turn. Choose one main action.`;
+    }
+    return;
+  }
+
   if (button.action === "menu") {
     game.screen = "menu";
     game.selectedAction = null;
@@ -1340,6 +1437,47 @@ function handleButton(button) {
     game.hoverCell = null;
     game.hoverModuleId = null;
     game.message = "Choose a player count and DNA set.";
+    return;
+  }
+
+  if (button.action === "openNames") {
+    game.screen = "names";
+    game.nameEditorNames = [...game.savedPlayerNames];
+    game.editingNameIndex = 0;
+    game.message = "Select a player row, type a name, then save it to this browser.";
+    return;
+  }
+
+  if (button.action === "cancelNames") {
+    game.screen = "menu";
+    game.nameEditorNames = [];
+    game.message = "Player names unchanged.";
+    return;
+  }
+
+  if (button.action === "resetNames") {
+    game.nameEditorNames = defaultPlayerNames();
+    game.editingNameIndex = 0;
+    game.message = "Names reset to the default player labels.";
+    return;
+  }
+
+  if (button.action === "saveNames") {
+    const defaults = defaultPlayerNames();
+    game.savedPlayerNames = defaults.map((fallback, index) => {
+      const value = (game.nameEditorNames[index] || "").trim();
+      return value || fallback;
+    });
+    savePlayerNamesToStorage(game.savedPlayerNames);
+    game.screen = "menu";
+    game.nameEditorNames = [];
+    game.message = "Player names saved to local storage.";
+    return;
+  }
+
+  if (button.action.startsWith("nameField:")) {
+    game.editingNameIndex = Number(button.action.split(":")[1]);
+    game.message = `Editing ${game.savedPlayerNames[game.editingNameIndex] || `Player ${game.editingNameIndex + 1}`}. Type a name and press Save Names when ready.`;
     return;
   }
 
@@ -1376,6 +1514,11 @@ function handleButton(button) {
 
   const player = currentPlayer();
 
+  if (game.passPrompt.active) {
+    game.message = `${currentPlayer().name}, pass the device and press OK when ready.`;
+    return;
+  }
+
   if (game.turnState.mainAction === ACTIONS.grow && game.turnState.growSpent > 0 && button.action !== ACTIONS.end) {
     game.message = "Finish the current grow action before choosing something else.";
     return;
@@ -1408,6 +1551,7 @@ function handleButton(button) {
 }
 
 function handlePlayCellClick(cell) {
+  if (game.passPrompt.active) return;
   if (!cell) return;
   const player = currentPlayer();
 
@@ -1456,10 +1600,10 @@ canvas.addEventListener("pointermove", (event) => {
   refreshButtons();
   const hoveredButton = buttonAt(point.x, point.y);
   game.hoverButton = hoveredButton ? hoveredButton.action : null;
-  game.hoverModuleId = hoveredButton && hoveredButton.action.startsWith("draft:")
+  game.hoverModuleId = hoveredButton && !game.passPrompt.active && hoveredButton.action.startsWith("draft:")
     ? hoveredButton.action.split(":")[1]
     : null;
-  game.hoverCell = game.screen === "play" ? findCellAt(point.x, point.y) : null;
+  game.hoverCell = game.screen === "play" && !game.passPrompt.active ? findCellAt(point.x, point.y) : null;
 });
 
 canvas.addEventListener("pointerleave", () => {
@@ -1500,7 +1644,57 @@ window.addEventListener("keydown", (event) => {
     return;
   }
 
+  if (game.screen === "names") {
+    const currentValue = game.nameEditorNames[game.editingNameIndex] || "";
+
+    if (event.key === "Tab") {
+      event.preventDefault();
+      game.editingNameIndex = (game.editingNameIndex + (event.shiftKey ? 4 : 1)) % 5;
+      return;
+    }
+
+    if (event.key === "Enter") {
+      const defaults = defaultPlayerNames();
+      game.savedPlayerNames = defaults.map((fallback, index) => {
+        const value = (game.nameEditorNames[index] || "").trim();
+        return value || fallback;
+      });
+      savePlayerNamesToStorage(game.savedPlayerNames);
+      game.screen = "menu";
+      game.nameEditorNames = [];
+      game.message = "Player names saved to local storage.";
+      return;
+    }
+
+    if (event.key === "Escape") {
+      game.screen = "menu";
+      game.nameEditorNames = [];
+      game.message = "Player names unchanged.";
+      return;
+    }
+
+    if (event.key === "Backspace") {
+      game.nameEditorNames[game.editingNameIndex] = currentValue.slice(0, -1);
+      return;
+    }
+
+    if (event.key === "Delete") {
+      game.nameEditorNames[game.editingNameIndex] = "";
+      return;
+    }
+
+    if (event.key.length === 1 && currentValue.length < 16) {
+      game.nameEditorNames[game.editingNameIndex] = `${currentValue}${event.key}`;
+    }
+    return;
+  }
+
   if (game.screen === "draft") {
+    if (game.passPrompt.active && (event.key === "Enter" || event.key === " ")) {
+      game.passPrompt.active = false;
+      game.message = `${currentPlayer().name}: draft module ${currentPlayer().modules.length + 1} of 3.`;
+      return;
+    }
     if (event.key.toLowerCase() === "r") {
       game.screen = "menu";
       game.message = "Choose a player count and DNA set.";
@@ -1510,6 +1704,16 @@ window.addEventListener("keydown", (event) => {
 
   if (game.screen === "end") {
     if (event.key.toLowerCase() === "r") beginDraft();
+    return;
+  }
+
+  if (game.passPrompt.active) {
+    if (event.key === "Enter" || event.key === " ") {
+      game.passPrompt.active = false;
+      game.message = forcedSeedTurn(currentPlayer())
+        ? `${currentPlayer().name}: place your first seed hub.`
+        : `${currentPlayer().name}'s turn. Choose one main action.`;
+    }
     return;
   }
 
@@ -1609,34 +1813,64 @@ function drawDiamond(x, y, width, height, fill, edge) {
   ctx.stroke();
 }
 
-function drawDNAModuleTile(moduleId, x, y, compact = false) {
-  const definition = moduleDef(moduleId);
-  const fill = MODULE_TYPE_COLORS[definition.type];
-  drawDiamond(x, y, compact ? 26 : 32, compact ? 18 : 22, fill, "#f4ead1");
-  const abbreviation = definition.name
-    .split(" ")
-    .map((word) => word[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-  drawText(abbreviation, x, y, compact ? 8 : 9, "#fff8ea", "center", "700");
+function drawPolygon(points, fill, edge, lineWidth = 1.5) {
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i += 1) {
+    ctx.lineTo(points[i].x, points[i].y);
+  }
+  ctx.closePath();
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.strokeStyle = edge;
+  ctx.lineWidth = lineWidth;
+  ctx.stroke();
 }
 
-function drawDNAModuleCluster(player, x, y, compact = false) {
+function drawCompositeDnaHex(player, x, y, compact = false) {
   if (!player || player.modules.length === 0) return;
-  const positions = compact ? [
-    { x, y: y - 8 },
-    { x: x - 13, y: y + 6 },
-    { x: x + 13, y: y + 6 },
-  ] : [
-    { x, y: y - 12 },
-    { x: x - 18, y: y + 9 },
-    { x: x + 18, y: y + 9 },
+
+  const halfWidth = compact ? 13 : 18;
+  const band = compact ? 7 : 10;
+  const seam = "#f4ead1";
+  const top = { x, y: y - band * 2 };
+  const upperRight = { x: x + halfWidth, y: y - band };
+  const lowerRight = { x: x + halfWidth, y: y + band };
+  const bottom = { x, y: y + band * 2 };
+  const lowerLeft = { x: x - halfWidth, y: y + band };
+  const upperLeft = { x: x - halfWidth, y: y - band };
+  const center = { x, y };
+
+  const pieces = [
+    {
+      moduleId: player.modules[0],
+      points: [top, upperRight, center, upperLeft],
+      label: { x, y: y - band },
+    },
+    {
+      moduleId: player.modules[1],
+      points: [upperLeft, center, bottom, lowerLeft],
+      label: { x: x - halfWidth / 2, y: y + band / 2 },
+    },
+    {
+      moduleId: player.modules[2],
+      points: [center, upperRight, lowerRight, bottom],
+      label: { x: x + halfWidth / 2, y: y + band / 2 },
+    },
   ];
 
-  player.modules.forEach((moduleId, index) => {
-    const pos = positions[index] || { x: x + index * 20, y };
-    drawDNAModuleTile(moduleId, pos.x, pos.y, compact);
+  pieces.forEach((piece) => {
+    if (!piece.moduleId) return;
+    const definition = moduleDef(piece.moduleId);
+    drawPolygon(piece.points, MODULE_TYPE_COLORS[definition.type], seam, compact ? 1.2 : 1.5);
+
+    const abbreviation = definition.name
+      .split(" ")
+      .map((word) => word[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+    drawText(abbreviation, piece.label.x, piece.label.y, compact ? 7 : 9, "#fff8ea", "center", "700");
   });
 }
 
@@ -1805,20 +2039,36 @@ function drawCompactScoreboard() {
   drawText(`Current: ${player.name}`, PANEL_X + 16, 88, 13, player.color, "left", "700");
   drawText(`Produce ${player.produce} | Score ${player.score}`, PANEL_X + 16, 102, 10, "#4d3a24", "left", "600");
 
-  game.players.forEach((entry, index) => {
-    const y = 121 + index * 10;
-    ctx.fillStyle = entry.color;
-    ctx.fillRect(PANEL_X + 10, y - 4, 8, 8);
-    drawText(`${entry.name}: ${entry.produce}P ${entry.score}VP`, PANEL_X + 24, y, 9, "#3f301d", "left", "600");
-  });
-
-  drawText("Show Your DNA Modules", PANEL_X + 10, 154, 11, "#4a371e", "left", "700");
-  drawDNAModuleCluster(player, PANEL_X + 42, 170, true);
+  drawText("Show Your DNA Modules", PANEL_X + 10, 126, 11, "#4a371e", "left", "700");
+  drawCompositeDnaHex(player, PANEL_X + 42, 142, true);
 
   player.modules.forEach((moduleId, index) => {
     const definition = moduleDef(moduleId);
-    const y = 162 + index * 9;
+    const y = 134 + index * 11;
     drawText(`${definition.name}: ${definition.short}`, PANEL_X + 78, y, 8, MODULE_TYPE_COLORS[definition.type], "left", "700");
+  });
+}
+
+function drawScoreDrawer() {
+  if (!game.showScores || game.screen !== "play") return;
+
+  const panelX = 16;
+  const panelY = 36;
+  const panelW = 132;
+  const panelH = 18 + game.players.length * 20;
+
+  ctx.fillStyle = "rgba(255, 249, 236, 0.97)";
+  ctx.fillRect(panelX, panelY, panelW, panelH);
+  ctx.strokeStyle = "#b79e74";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(panelX, panelY, panelW, panelH);
+
+  game.players.forEach((player, index) => {
+    const rowY = panelY + 14 + index * 20;
+    ctx.fillStyle = player.color;
+    ctx.fillRect(panelX + 8, rowY - 5, 10, 10);
+    drawText(player.name, panelX + 24, rowY - 1, 10, player.color, "left", "700");
+    drawText(`${player.produce}P ${player.score}VP`, panelX + 24, rowY + 9, 9, "#4b3922", "left", "600");
   });
 }
 
@@ -1869,6 +2119,22 @@ function drawMessageBar() {
   }
 }
 
+function drawPassPromptOverlay() {
+  const player = game.players[game.passPrompt.playerId];
+
+  ctx.fillStyle = "rgba(28, 20, 12, 0.62)";
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+  ctx.fillStyle = "rgba(248, 241, 224, 0.98)";
+  ctx.fillRect(210, 82, 380, 108);
+  ctx.strokeStyle = "#9f8355";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(210, 82, 380, 108);
+
+  drawText(`${player.name} turn`, WIDTH / 2, 114, 26, player.color, "center", "700");
+  drawText("Pass the device, then press OK.", WIDTH / 2, 142, 14, "#4e3c24", "center", "600");
+}
+
 function drawMenu() {
   drawBackground();
   drawText("Growing Seeds", WIDTH / 2, 54, 32, "#3c2b1a", "center", "700");
@@ -1879,7 +2145,47 @@ function drawMenu() {
   drawText("Player Count", WIDTH / 2, 164, 14, "#4a371e", "center", "700");
   drawText("Draft 3 DNA modules per player before planting your first seed.", WIDTH / 2, 278, 11, "#5d4a2f", "center", "500");
 
+  drawText("Saved Names", 688, 216, 12, "#4a371e", "center", "700");
+  game.savedPlayerNames.forEach((name, index) => {
+    drawText(`${index + 1}. ${name}`, 688, 230 + index * 10, 10, PLAYER_COLORS[index], "center", "600");
+  });
+
   game.uiButtons.forEach(drawButton);
+}
+
+function drawNameEditorScreen() {
+  drawBackground();
+  drawText("Change Player Names", WIDTH / 2, 40, 28, "#3c2b1a", "center", "700");
+  drawText("Click a row, type a name, and save it to this browser.", WIDTH / 2, 62, 13, "#5c4a31", "center", "500");
+
+  ctx.fillStyle = "rgba(255, 249, 236, 0.86)";
+  ctx.fillRect(132, 52, 536, 188);
+  ctx.strokeStyle = "#b79e74";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(132, 52, 536, 188);
+
+  for (let index = 0; index < 5; index += 1) {
+    const y = 72 + index * 32;
+    const isActive = game.editingNameIndex === index;
+    ctx.fillStyle = isActive ? "rgba(79, 127, 55, 0.16)" : "rgba(255, 252, 244, 0.95)";
+    ctx.fillRect(170, y, 460, 26);
+    ctx.strokeStyle = isActive ? "#4f7f37" : "#a88f63";
+    ctx.lineWidth = isActive ? 2.5 : 1.5;
+    ctx.strokeRect(170, y, 460, 26);
+
+    drawText(`Player ${index + 1}`, 184, y + 13, 11, PLAYER_COLORS[index], "left", "700");
+
+    const name = game.nameEditorNames[index] || "";
+    const showCaret = isActive && Math.floor(Date.now() / 450) % 2 === 0;
+    const display = isActive && showCaret ? `${name}|` : name || "Type a name";
+    drawText(display, 278, y + 13, 12, name ? "#3d2c17" : "#8a7a62", "left", name ? "600" : "500");
+  }
+
+  drawText("Keyboard: type, Backspace deletes, Tab changes row, Enter saves.", WIDTH / 2, 224, 10, "#5d4a2f", "center", "500");
+  game.uiButtons
+    .filter((button) => !button.action.startsWith("nameField:"))
+    .forEach(drawButton);
+  drawMessageBar();
 }
 
 function drawDraftScreen() {
@@ -1901,7 +2207,7 @@ function drawDraftScreen() {
   ctx.strokeRect(PANEL_X, 48, PANEL_W, 192);
 
   drawText("Current DNA Cluster", PANEL_X + 12, 64, 12, "#4a371e", "left", "700");
-  drawDNAModuleCluster(currentPlayer(), PANEL_X + 66, 90);
+  drawCompositeDnaHex(currentPlayer(), PANEL_X + 66, 90);
 
   currentPlayer().modules.forEach((moduleId, index) => {
     const definition = moduleDef(moduleId);
@@ -1920,6 +2226,10 @@ function drawDraftScreen() {
 
   game.uiButtons.forEach(drawButton);
   drawMessageBar();
+  if (game.passPrompt.active) {
+    drawPassPromptOverlay();
+    game.uiButtons.forEach(drawButton);
+  }
 }
 
 function drawEndScreen() {
@@ -1950,10 +2260,15 @@ function drawEndScreen() {
 function drawPlayScreen() {
   drawBackground();
   drawBoard();
+  drawScoreDrawer();
   drawCompactScoreboard();
   drawLegendStrip();
   game.uiButtons.forEach(drawButton);
   drawMessageBar();
+  if (game.passPrompt.active) {
+    drawPassPromptOverlay();
+    game.uiButtons.forEach(drawButton);
+  }
 }
 
 function render() {
@@ -1961,6 +2276,8 @@ function render() {
 
   if (game.screen === "menu") {
     drawMenu();
+  } else if (game.screen === "names") {
+    drawNameEditorScreen();
   } else if (game.screen === "draft") {
     drawDraftScreen();
   } else if (game.screen === "play") {
