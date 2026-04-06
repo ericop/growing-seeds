@@ -344,6 +344,9 @@ const game = {
     active: false,
     playerId: 0,
   },
+  exitPrompt: {
+    active: false,
+  },
   turnState: {
     mainAction: null,
     growRemaining: 0,
@@ -1172,6 +1175,7 @@ function beginDraft() {
   game.winnerText = "";
   game.finalBreakdowns = [];
   game.screen = "draft";
+  game.exitPrompt.active = false;
   game.passPrompt = {
     active: true,
     playerId: game.currentPlayer,
@@ -1188,6 +1192,7 @@ function startGameFromDraft() {
   game.hoverModuleId = null;
   game.lastAction = "DNA draft complete.";
   game.nextUnitId = 1;
+  game.exitPrompt.active = false;
   game.passPrompt = {
     active: false,
     playerId: 0,
@@ -1341,10 +1346,13 @@ function refreshButtons() {
   }
 
   if (game.screen === "draft") {
-    buttons.push(makeButton(638, 10, 108, 22, "Menu", "menu"));
+    buttons.push(makeButton(638, 10, 108, 22, "Main Menu", "openExitPrompt"));
     buttons.push(fullButton);
 
-    if (game.passPrompt.active) {
+    if (game.exitPrompt.active) {
+      buttons.push(makeButton(252, 160, 140, 32, "Yes, exit", "confirmExit"));
+      buttons.push(makeButton(408, 160, 140, 32, "No, resume game", "cancelExit"));
+    } else if (game.passPrompt.active) {
       buttons.push(makeButton(330, 152, 140, 34, "OK", "handoffOk"));
     } else {
       const columns = 3;
@@ -1377,12 +1385,19 @@ function refreshButtons() {
     const canHarvest = getVisibleHexCount(player.id) > 0;
     const growPreview = calculateManualGrowPlan(player);
 
-    if (game.passPrompt.active) {
+    if (game.exitPrompt.active) {
       buttons.push(makeButton(16, 10, 82, 22, game.showScores ? "V Score" : "> Score", "toggleScores"));
+      buttons.push(makeButton(638, 10, 108, 22, "Main Menu", "openExitPrompt"));
+      buttons.push(fullButton);
+      buttons.push(makeButton(252, 160, 140, 32, "Yes, exit", "confirmExit"));
+      buttons.push(makeButton(408, 160, 140, 32, "No, resume game", "cancelExit"));
+    } else if (game.passPrompt.active) {
+      buttons.push(makeButton(16, 10, 82, 22, game.showScores ? "V Score" : "> Score", "toggleScores"));
+      buttons.push(makeButton(638, 10, 108, 22, "Main Menu", "openExitPrompt"));
       buttons.push(fullButton);
       buttons.push(makeButton(330, 152, 140, 34, "OK", "handoffOk"));
     } else {
-      buttons.push(makeButton(638, 10, 108, 22, "New Game", "menu"));
+      buttons.push(makeButton(638, 10, 108, 22, "Main Menu", "openExitPrompt"));
       buttons.push(makeButton(16, 10, 82, 22, game.showScores ? "V Score" : "> Score", "toggleScores"));
       buttons.push(fullButton);
       buttons.push(makeButton(PANEL_X + 10, 194, 132, 22, mustPlant ? "Plant First Seed" : "Plant Seed", ACTIONS.plant, canPlant, game.selectedAction === ACTIONS.plant));
@@ -1395,7 +1410,7 @@ function refreshButtons() {
   if (game.screen === "end") {
     buttons.push(fullButton);
     buttons.push(makeButton(244, 206, 144, 34, "Restart", "restart"));
-    buttons.push(makeButton(414, 206, 144, 34, "Menu", "menu"));
+    buttons.push(makeButton(414, 206, 144, 34, "Main Menu", "menu"));
   }
 
   game.uiButtons = buttons;
@@ -1406,6 +1421,33 @@ function handleButton(button) {
 
   if (button.action === "fullscreen") {
     toggleFullscreen();
+    return;
+  }
+
+  if (button.action === "openExitPrompt") {
+    game.exitPrompt.active = true;
+    game.message = "Exit confirmation opened.";
+    return;
+  }
+
+  if (button.action === "cancelExit") {
+    game.exitPrompt.active = false;
+    game.message = game.screen === "draft"
+      ? `${currentPlayer().name}: draft module ${currentPlayer().modules.length + 1} of 3.`
+      : `${currentPlayer().name}'s game is still in progress.`;
+    return;
+  }
+
+  if (button.action === "confirmExit") {
+    game.exitPrompt.active = false;
+    game.passPrompt.active = false;
+    game.screen = "menu";
+    game.selectedAction = null;
+    game.players = [];
+    game.availableModules = [];
+    game.hoverCell = null;
+    game.hoverModuleId = null;
+    game.message = "Choose a player count and DNA set.";
     return;
   }
 
@@ -1551,6 +1593,7 @@ function handleButton(button) {
 }
 
 function handlePlayCellClick(cell) {
+  if (game.exitPrompt.active) return;
   if (game.passPrompt.active) return;
   if (!cell) return;
   const player = currentPlayer();
@@ -1600,10 +1643,10 @@ canvas.addEventListener("pointermove", (event) => {
   refreshButtons();
   const hoveredButton = buttonAt(point.x, point.y);
   game.hoverButton = hoveredButton ? hoveredButton.action : null;
-  game.hoverModuleId = hoveredButton && !game.passPrompt.active && hoveredButton.action.startsWith("draft:")
+  game.hoverModuleId = hoveredButton && !game.passPrompt.active && !game.exitPrompt.active && hoveredButton.action.startsWith("draft:")
     ? hoveredButton.action.split(":")[1]
     : null;
-  game.hoverCell = game.screen === "play" && !game.passPrompt.active ? findCellAt(point.x, point.y) : null;
+  game.hoverCell = game.screen === "play" && !game.passPrompt.active && !game.exitPrompt.active ? findCellAt(point.x, point.y) : null;
 });
 
 canvas.addEventListener("pointerleave", () => {
@@ -1690,6 +1733,13 @@ window.addEventListener("keydown", (event) => {
   }
 
   if (game.screen === "draft") {
+    if (game.exitPrompt.active) {
+      if (event.key === "Escape") {
+        game.exitPrompt.active = false;
+        game.message = `${currentPlayer().name}: draft module ${currentPlayer().modules.length + 1} of 3.`;
+      }
+      return;
+    }
     if (game.passPrompt.active && (event.key === "Enter" || event.key === " ")) {
       game.passPrompt.active = false;
       game.message = `${currentPlayer().name}: draft module ${currentPlayer().modules.length + 1} of 3.`;
@@ -1704,6 +1754,14 @@ window.addEventListener("keydown", (event) => {
 
   if (game.screen === "end") {
     if (event.key.toLowerCase() === "r") beginDraft();
+    return;
+  }
+
+  if (game.exitPrompt.active) {
+    if (event.key === "Escape") {
+      game.exitPrompt.active = false;
+      game.message = `${currentPlayer().name}'s game is still in progress.`;
+    }
     return;
   }
 
@@ -2135,6 +2193,19 @@ function drawPassPromptOverlay() {
   drawText("Pass the device, then press OK.", WIDTH / 2, 142, 14, "#4e3c24", "center", "600");
 }
 
+function drawExitPromptOverlay() {
+  ctx.fillStyle = "rgba(28, 20, 12, 0.68)";
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+  ctx.fillStyle = "rgba(248, 241, 224, 0.99)";
+  ctx.fillRect(190, 90, 420, 110);
+  ctx.strokeStyle = "#9f8355";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(190, 90, 420, 110);
+
+  drawText("Are you sure you want to exit your current game?", WIDTH / 2, 126, 17, "#4e3c24", "center", "700");
+}
+
 function drawMenu() {
   drawBackground();
   drawText("Growing Seeds", WIDTH / 2, 54, 32, "#3c2b1a", "center", "700");
@@ -2226,6 +2297,10 @@ function drawDraftScreen() {
 
   game.uiButtons.forEach(drawButton);
   drawMessageBar();
+  if (game.exitPrompt.active) {
+    drawExitPromptOverlay();
+    game.uiButtons.forEach(drawButton);
+  }
   if (game.passPrompt.active) {
     drawPassPromptOverlay();
     game.uiButtons.forEach(drawButton);
@@ -2265,7 +2340,10 @@ function drawPlayScreen() {
   drawLegendStrip();
   game.uiButtons.forEach(drawButton);
   drawMessageBar();
-  if (game.passPrompt.active) {
+  if (game.exitPrompt.active) {
+    drawExitPromptOverlay();
+    game.uiButtons.forEach(drawButton);
+  } else if (game.passPrompt.active) {
     drawPassPromptOverlay();
     game.uiButtons.forEach(drawButton);
   }
