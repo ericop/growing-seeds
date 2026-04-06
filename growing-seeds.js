@@ -1883,13 +1883,13 @@ function drawDraftScreen() {
   drawBackground();
   drawText("DNA Draft", 20, 28, 28, "#3c2b1a", "left", "700");
   drawText(`${currentPlayer().name}: pick module ${currentPlayer().modules.length + 1} of 3`, 20, 50, 13, currentPlayer().color, "left", "700");
-  drawText(game.gameMode === GAME_MODES.starter ? "Starter Set: all 12 starter modules are available." : "Advanced Set: 12 modules sampled from the 24-module pool.", 260, 50, 11, "#5d4a2f", "center", "500");
+  drawText(game.gameMode === GAME_MODES.starter ? "Starter Set: all 12 starter modules are available." : "Advanced Set: 12 modules sampled from the 24-module pool.", 20, 64, 11, "#5d4a2f", "left", "500");
 
   ctx.fillStyle = "rgba(255, 249, 236, 0.7)";
-  ctx.fillRect(14, 62, 462, 178);
+  ctx.fillRect(14, 76, 462, 164);
   ctx.strokeStyle = "#b79e74";
   ctx.lineWidth = 2;
-  ctx.strokeRect(14, 62, 462, 178);
+  ctx.strokeRect(14, 76, 462, 164);
 
   ctx.fillStyle = "rgba(255, 250, 239, 0.94)";
   ctx.fillRect(PANEL_X, 48, PANEL_W, 192);
