@@ -37,6 +37,14 @@ const NAME_INPUT_X = 274;
 const NAME_INPUT_W = 344;
 const NAME_INPUT_Y_INSET = 2;
 const NAME_INPUT_H = 22;
+const TUTORIAL_PANEL_X = 150;
+const TUTORIAL_PANEL_Y = 66;
+const TUTORIAL_PANEL_W = 500;
+const TUTORIAL_PANEL_H = 164;
+const TUTORIAL_PREVIEW_X = 176;
+const TUTORIAL_PREVIEW_Y = 96;
+const TUTORIAL_PREVIEW_W = 132;
+const TUTORIAL_PREVIEW_H = 82;
 
 const ACTIONS = {
   plant: "plant",
@@ -49,6 +57,39 @@ const GAME_MODES = {
   starter: "starter",
   advanced: "advanced",
 };
+
+const TUTORIAL_STEPS = [
+  {
+    title: "Goal",
+    text: "Build your garden by placing DNA modules. Score the most points to win.",
+    preview: "goal",
+  },
+  {
+    title: "Pick 3 Modules",
+    text: "Each turn, choose 3 DNA modules to combine into one hex.",
+    preview: "pick",
+  },
+  {
+    title: "Build a Hex",
+    text: "Your 3 modules must connect edge-to-edge to form a single hex cluster.",
+    preview: "hex",
+  },
+  {
+    title: "Plant Your Hex",
+    text: "Place your hex onto the board. It must connect to your existing garden.",
+    preview: "plant",
+  },
+  {
+    title: "Growth",
+    text: "Some modules trigger effects when placed, helping your garden grow.",
+    preview: "growth",
+  },
+  {
+    title: "Winning",
+    text: "Score points from your placements. Highest score wins.",
+    preview: "win",
+  },
+];
 
 const MODULE_TYPE_COLORS = {
   growth: "#5f8d39",
@@ -346,6 +387,8 @@ const game = {
   hoverModuleId: null,
   uiButtons: [],
   message: "Choose a player count and DNA set.",
+  tutorialOpen: false,
+  tutorialStep: 0,
   lastAction: "",
   winnerText: "",
   finalBreakdowns: [],
@@ -1600,6 +1643,14 @@ function refreshButtons() {
   const buttons = [];
   const fullButton = makeButton(752, 10, 28, 22, "", "fullscreen", fullscreenSupported());
 
+  if (game.tutorialOpen) {
+    buttons.push(makeButton(TUTORIAL_PANEL_X + 22, TUTORIAL_PANEL_Y + 122, 108, 28, "Back", "tutorialBack", game.tutorialStep > 0));
+    buttons.push(makeButton(TUTORIAL_PANEL_X + 186, TUTORIAL_PANEL_Y + 122, 128, 28, game.tutorialStep === TUTORIAL_STEPS.length - 1 ? "Done" : "Next", "tutorialNext"));
+    buttons.push(makeButton(TUTORIAL_PANEL_X + 390, TUTORIAL_PANEL_Y + 14, 84, 24, "Close", "tutorialClose"));
+    game.uiButtons = buttons;
+    return;
+  }
+
   if (game.screen === "menu") {
     buttons.push(fullButton);
     buttons.push(makeButton(164, 118, 146, 32, "Starter Set", "mode:starter", true, game.gameMode === GAME_MODES.starter, "simple"));
@@ -1611,6 +1662,7 @@ function refreshButtons() {
 
     buttons.push(makeButton(614, 174, 148, 34, "Change Names", "openNames"));
     buttons.push(makeButton(300, 222, 200, 38, "Begin DNA Draft", "beginDraft"));
+    buttons.push(makeButton(614, 222, 148, 38, "How to Play", "openTutorial"));
   }
 
   if (game.screen === "names") {
@@ -1699,6 +1751,36 @@ function handleButton(button) {
 
   if (button.action === "fullscreen") {
     toggleFullscreen();
+    return;
+  }
+
+  if (button.action === "openTutorial") {
+    game.tutorialOpen = true;
+    game.tutorialStep = 0;
+    game.message = "How to Play opened.";
+    return;
+  }
+
+  if (button.action === "tutorialClose") {
+    game.tutorialOpen = false;
+    game.message = "How to Play closed.";
+    return;
+  }
+
+  if (button.action === "tutorialBack") {
+    game.tutorialStep = clamp(game.tutorialStep - 1, 0, TUTORIAL_STEPS.length - 1);
+    game.message = `${currentTutorialStep().title}.`;
+    return;
+  }
+
+  if (button.action === "tutorialNext") {
+    if (game.tutorialStep >= TUTORIAL_STEPS.length - 1) {
+      game.tutorialOpen = false;
+      game.message = "How to Play closed.";
+      return;
+    }
+    game.tutorialStep += 1;
+    game.message = `${currentTutorialStep().title}.`;
     return;
   }
 
@@ -1912,10 +1994,10 @@ canvas.addEventListener("pointermove", (event) => {
   refreshButtons();
   const hoveredButton = buttonAt(point.x, point.y);
   game.hoverButton = hoveredButton ? hoveredButton.action : null;
-  game.hoverModuleId = hoveredButton && !game.passPrompt.active && !game.exitPrompt.active && hoveredButton.action.startsWith("draft:")
+  game.hoverModuleId = hoveredButton && !game.tutorialOpen && !game.passPrompt.active && !game.exitPrompt.active && hoveredButton.action.startsWith("draft:")
     ? hoveredButton.action.split(":")[1]
     : null;
-  game.hoverCell = game.screen === "play" && !game.passPrompt.active && !game.exitPrompt.active ? findCellAt(point.x, point.y) : null;
+  game.hoverCell = game.screen === "play" && !game.tutorialOpen && !game.passPrompt.active && !game.exitPrompt.active ? findCellAt(point.x, point.y) : null;
 });
 
 canvas.addEventListener("pointerleave", () => {
@@ -1928,6 +2010,12 @@ canvas.addEventListener("pointerdown", (event) => {
   const point = canvasPoint(event);
   refreshButtons();
   const button = buttonAt(point.x, point.y);
+
+  if (game.tutorialOpen) {
+    if (button) handleButton(button);
+    refreshButtons();
+    return;
+  }
 
   if (game.screen === "names" && nameEditor && nameEditor.activePlayerIndex >= 0) {
     const activeFieldAction = `nameField:${nameEditor.activePlayerIndex}`;
@@ -1962,6 +2050,28 @@ canvas.addEventListener("pointerdown", (event) => {
 });
 
 window.addEventListener("keydown", (event) => {
+  if (game.tutorialOpen) {
+    if (event.key === "Escape") {
+      game.tutorialOpen = false;
+      game.message = "How to Play closed.";
+      return;
+    }
+    if (event.key === "ArrowLeft") {
+      game.tutorialStep = clamp(game.tutorialStep - 1, 0, TUTORIAL_STEPS.length - 1);
+      return;
+    }
+    if (event.key === "ArrowRight" || event.key === "Enter" || event.key === " ") {
+      if (game.tutorialStep >= TUTORIAL_STEPS.length - 1) {
+        game.tutorialOpen = false;
+        game.message = "How to Play closed.";
+      } else {
+        game.tutorialStep += 1;
+      }
+      return;
+    }
+    return;
+  }
+
   if (game.screen === "names" && nameEditor && document.activeElement === nameEditor.input) {
     return;
   }
@@ -2116,6 +2226,134 @@ function drawWrappedText(text, x, y, size, color, maxWidth, lineHeight, align = 
     drawText(line, x, y + index * lineHeight, size, color, align, weight);
   });
   return lines.length;
+}
+
+function tutorialPreviewPlayer() {
+  return {
+    modules: ["doubleSeedPod", "tallStalk", "branchSplitter"],
+  };
+}
+
+function currentTutorialStep() {
+  return TUTORIAL_STEPS[clamp(game.tutorialStep, 0, TUTORIAL_STEPS.length - 1)];
+}
+
+function drawTutorialPreview() {
+  const step = currentTutorialStep();
+
+  ctx.fillStyle = "rgba(255, 252, 244, 0.98)";
+  ctx.fillRect(TUTORIAL_PREVIEW_X, TUTORIAL_PREVIEW_Y, TUTORIAL_PREVIEW_W, TUTORIAL_PREVIEW_H);
+  ctx.strokeStyle = "#d6bc8a";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(TUTORIAL_PREVIEW_X, TUTORIAL_PREVIEW_Y, TUTORIAL_PREVIEW_W, TUTORIAL_PREVIEW_H);
+
+  if (step.preview === "goal") {
+    drawCompositeDnaHex(tutorialPreviewPlayer(), TUTORIAL_PREVIEW_X + 34, TUTORIAL_PREVIEW_Y + 34, true, 1.1);
+    pathHex(TUTORIAL_PREVIEW_X + 92, TUTORIAL_PREVIEW_Y + 46, 12);
+    ctx.fillStyle = "rgba(198, 220, 139, 0.95)";
+    ctx.fill();
+    ctx.strokeStyle = "#6f8e2d";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    drawText("VP", TUTORIAL_PREVIEW_X + 92, TUTORIAL_PREVIEW_Y + 46, 9, "#4a371e", "center", "700");
+    return;
+  }
+
+  if (step.preview === "pick") {
+    const sampleModules = ["branchSplitter", "tallStalk", "doubleSeedPod"];
+    sampleModules.forEach((moduleId, index) => {
+      const fill = MODULE_TYPE_COLORS[moduleDef(moduleId).type];
+      const tileX = TUTORIAL_PREVIEW_X + 12 + (index % 2) * 56;
+      const tileY = TUTORIAL_PREVIEW_Y + 12 + Math.floor(index / 2) * 30;
+      ctx.fillStyle = fill;
+      ctx.fillRect(tileX, tileY, 48, 22);
+      ctx.strokeStyle = "#f4ead1";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(tileX, tileY, 48, 22);
+      drawText(moduleDef(moduleId).name.split(" ")[0], tileX + 24, tileY + 11, 8, "#fff8ea", "center", "700");
+    });
+    return;
+  }
+
+  if (step.preview === "hex") {
+    drawCompositeDnaHex(tutorialPreviewPlayer(), TUTORIAL_PREVIEW_X + 66, TUTORIAL_PREVIEW_Y + 40, true, 1.35);
+    ctx.strokeStyle = "#d4a332";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(TUTORIAL_PREVIEW_X + 20, TUTORIAL_PREVIEW_Y + 12, 92, 56);
+    return;
+  }
+
+  if (step.preview === "plant") {
+    [
+      { x: TUTORIAL_PREVIEW_X + 36, y: TUTORIAL_PREVIEW_Y + 28 },
+      { x: TUTORIAL_PREVIEW_X + 58, y: TUTORIAL_PREVIEW_Y + 40 },
+      { x: TUTORIAL_PREVIEW_X + 80, y: TUTORIAL_PREVIEW_Y + 28 },
+    ].forEach((cell) => {
+      pathHex(cell.x, cell.y, 11);
+      ctx.fillStyle = "rgba(255, 249, 236, 0.95)";
+      ctx.fill();
+      ctx.strokeStyle = "#b79e74";
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
+    });
+    drawCompositeDnaHex(tutorialPreviewPlayer(), TUTORIAL_PREVIEW_X + 84, TUTORIAL_PREVIEW_Y + 46, true, 0.9);
+    ctx.strokeStyle = "#4f7f37";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(TUTORIAL_PREVIEW_X + 18, TUTORIAL_PREVIEW_Y + 58, 96, 16);
+    drawText("Plant", TUTORIAL_PREVIEW_X + 66, TUTORIAL_PREVIEW_Y + 66, 8, "#4f7f37", "center", "700");
+    return;
+  }
+
+  if (step.preview === "growth") {
+    ctx.fillStyle = "rgba(79, 127, 55, 0.14)";
+    ctx.fillRect(TUTORIAL_PREVIEW_X + 18, TUTORIAL_PREVIEW_Y + 50, 96, 18);
+    ctx.strokeStyle = "#4f7f37";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(TUTORIAL_PREVIEW_X + 18, TUTORIAL_PREVIEW_Y + 50, 96, 18);
+    drawText("Grow x1", TUTORIAL_PREVIEW_X + 66, TUTORIAL_PREVIEW_Y + 59, 9, "#4f7f37", "center", "700");
+    ctx.beginPath();
+    ctx.moveTo(TUTORIAL_PREVIEW_X + 66, TUTORIAL_PREVIEW_Y + 44);
+    ctx.lineTo(TUTORIAL_PREVIEW_X + 66, TUTORIAL_PREVIEW_Y + 26);
+    ctx.lineTo(TUTORIAL_PREVIEW_X + 60, TUTORIAL_PREVIEW_Y + 32);
+    ctx.moveTo(TUTORIAL_PREVIEW_X + 66, TUTORIAL_PREVIEW_Y + 26);
+    ctx.lineTo(TUTORIAL_PREVIEW_X + 72, TUTORIAL_PREVIEW_Y + 32);
+    ctx.strokeStyle = "#d4a332";
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+    return;
+  }
+
+  ctx.fillStyle = "rgba(68, 123, 42, 0.12)";
+  ctx.fillRect(TUTORIAL_PREVIEW_X + 16, TUTORIAL_PREVIEW_Y + 18, 100, 18);
+  drawText("Score 12", TUTORIAL_PREVIEW_X + 66, TUTORIAL_PREVIEW_Y + 27, 10, "#4d3a24", "center", "700");
+  drawText("Highest wins", TUTORIAL_PREVIEW_X + 66, TUTORIAL_PREVIEW_Y + 54, 9, "#5d4a2f", "center", "600");
+}
+
+function drawTutorialOverlay() {
+  const step = currentTutorialStep();
+  const bodyX = TUTORIAL_PANEL_X + 176;
+  const bodyY = TUTORIAL_PANEL_Y + 76;
+  const bodyWidth = 288;
+
+  ctx.fillStyle = "rgba(18, 13, 8, 0.74)";
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+  if (game.screen === "menu" && game.tutorialStep === 0) {
+    ctx.strokeStyle = "#d4a332";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(300, 222, 200, 38);
+  }
+
+  ctx.fillStyle = "rgba(255, 249, 236, 0.98)";
+  ctx.fillRect(TUTORIAL_PANEL_X, TUTORIAL_PANEL_Y, TUTORIAL_PANEL_W, TUTORIAL_PANEL_H);
+  ctx.strokeStyle = "#b79e74";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(TUTORIAL_PANEL_X, TUTORIAL_PANEL_Y, TUTORIAL_PANEL_W, TUTORIAL_PANEL_H);
+
+  drawText(`How to Play  ${game.tutorialStep + 1}/${TUTORIAL_STEPS.length}`, WIDTH / 2, TUTORIAL_PANEL_Y + 24, 14, "#4a371e", "center", "700");
+  drawText(step.title, bodyX, TUTORIAL_PANEL_Y + 48, 22, "#3c2b1a", "left", "700");
+  drawWrappedText(step.text, bodyX, bodyY, 13, "#5a482e", bodyWidth, 18, "left", "600");
+  drawTutorialPreview();
 }
 
 function drawTerrainPattern(cell) {
@@ -2807,6 +3045,11 @@ function render() {
     drawPlayScreen();
   } else {
     drawEndScreen();
+  }
+
+  if (game.tutorialOpen) {
+    drawTutorialOverlay();
+    game.uiButtons.forEach(drawButton);
   }
 
   requestAnimationFrame(render);
