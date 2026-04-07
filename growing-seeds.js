@@ -1,30 +1,6 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-const nameEditorInput = document.createElement("input");
-
-nameEditorInput.type = "text";
-nameEditorInput.maxLength = 16;
-nameEditorInput.autocomplete = "off";
-nameEditorInput.autocorrect = "off";
-nameEditorInput.autocapitalize = "words";
-nameEditorInput.spellcheck = false;
-nameEditorInput.inputMode = "text";
-nameEditorInput.setAttribute("aria-label", "Player name");
-Object.assign(nameEditorInput.style, {
-  position: "fixed",
-  top: "0",
-  left: "0",
-  width: "1px",
-  height: "1px",
-  padding: "0",
-  border: "0",
-  opacity: "0.01",
-  pointerEvents: "none",
-  background: "transparent",
-  color: "transparent",
-  caretColor: "transparent",
-});
-document.body.appendChild(nameEditorInput);
+let nameEditor = null;
 
 // ------------------------------------------------------------
 // Config
@@ -51,6 +27,16 @@ const LEGEND_Y = 242;
 const LEGEND_H = 22;
 const MESSAGE_Y = 268;
 const MESSAGE_H = 24;
+const NAME_EDITOR_ROWS = 5;
+const MAX_PLAYER_NAME_LENGTH = 20;
+const NAME_ROW_X = 170;
+const NAME_ROW_Y = 72;
+const NAME_ROW_W = 460;
+const NAME_ROW_H = 26;
+const NAME_INPUT_X = 274;
+const NAME_INPUT_W = 344;
+const NAME_INPUT_Y_INSET = 2;
+const NAME_INPUT_H = 22;
 
 const ACTIONS = {
   plant: "plant",
@@ -310,7 +296,7 @@ const ADVANCED_EXTRA_MODULE_IDS = [
 const ADVANCED_POOL_IDS = STARTER_MODULE_IDS.concat(ADVANCED_EXTRA_MODULE_IDS);
 
 function defaultPlayerNames() {
-  return Array.from({ length: 5 }, (_, index) => `Player ${index + 1}`);
+  return Array.from({ length: NAME_EDITOR_ROWS }, (_, index) => `Player ${index + 1}`);
 }
 
 function loadSavedPlayerNames() {
@@ -345,7 +331,7 @@ const game = {
   gameMode: GAME_MODES.starter,
   savedPlayerNames: loadSavedPlayerNames(),
   nameEditorNames: [],
-  editingNameIndex: 0,
+  editingNameIndex: -1,
   showScores: false,
   board: [],
   boardMap: new Map(),
@@ -534,90 +520,250 @@ async function toggleFullscreen() {
   }
 }
 
-function syncNameEditorInput(shouldFocus = false) {
-  if (game.screen !== "names") {
-    if (document.activeElement === nameEditorInput) {
-      nameEditorInput.blur();
-    }
-    return;
-  }
-
-  const value = game.nameEditorNames[game.editingNameIndex] || "";
-  if (nameEditorInput.value !== value) {
-    nameEditorInput.value = value;
-  }
-
-  if (shouldFocus) {
-    try {
-      nameEditorInput.focus({ preventScroll: true });
-    } catch (error) {
-      nameEditorInput.focus();
-    }
-    if (typeof nameEditorInput.setSelectionRange === "function") {
-      const caret = nameEditorInput.value.length;
-      nameEditorInput.setSelectionRange(caret, caret);
-    }
-  }
+function playerNameRowCanvasRect(index) {
+  return {
+    x: NAME_ROW_X,
+    y: NAME_ROW_Y + index * 32,
+    w: NAME_ROW_W,
+    h: NAME_ROW_H,
+  };
 }
 
-function activateNameField(index, shouldFocus = true) {
-  game.editingNameIndex = clamp(index, 0, 4);
-  syncNameEditorInput(shouldFocus);
-  game.message = `Editing ${game.savedPlayerNames[game.editingNameIndex] || `Player ${game.editingNameIndex + 1}`}. Type a name and press Save Names when ready.`;
+function playerNameInputCanvasRect(index) {
+  const row = playerNameRowCanvasRect(index);
+  return {
+    x: NAME_INPUT_X,
+    y: row.y + NAME_INPUT_Y_INSET,
+    w: NAME_INPUT_W,
+    h: NAME_INPUT_H,
+  };
 }
 
-function saveEditedPlayerNames() {
+function canvasRectToScreenRect(rect) {
+  const bounds = canvas.getBoundingClientRect();
+  const scaleX = bounds.width / canvas.width;
+  const scaleY = bounds.height / canvas.height;
+
+  return {
+    left: bounds.left + rect.x * scaleX,
+    top: bounds.top + rect.y * scaleY,
+    width: rect.w * scaleX,
+    height: rect.h * scaleY,
+  };
+}
+
+function playerNameInputScreenRect(index) {
+  return canvasRectToScreenRect(playerNameInputCanvasRect(index));
+}
+
+function persistEditedPlayerNames() {
   const defaults = defaultPlayerNames();
   game.savedPlayerNames = defaults.map((fallback, index) => {
     const value = (game.nameEditorNames[index] || "").trim();
     return value || fallback;
   });
   savePlayerNamesToStorage(game.savedPlayerNames);
+}
+
+function createNameEditor() {
+  if (nameEditor) return nameEditor;
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.inputMode = "text";
+  input.maxLength = MAX_PLAYER_NAME_LENGTH;
+  input.autocomplete = "off";
+  input.autocorrect = "off";
+  input.autocapitalize = "words";
+  input.spellcheck = false;
+  input.enterKeyHint = "done";
+  input.setAttribute("enterkeyhint", "done");
+  input.setAttribute("aria-label", "Player name");
+  Object.assign(input.style, {
+    position: "fixed",
+    display: "none",
+    margin: "0",
+    boxSizing: "border-box",
+    zIndex: "10",
+    border: "2px solid #4f7f37",
+    borderRadius: "2px",
+    background: "rgba(255, 252, 244, 0.98)",
+    color: "#3d2c17",
+    caretColor: "#3d2c17",
+    outline: "none",
+    boxShadow: "0 1px 4px rgba(61, 44, 23, 0.16)",
+  });
+  document.body.appendChild(input);
+
+  nameEditor = {
+    input,
+    activePlayerIndex: -1,
+    suppressBlurCommit: false,
+  };
+
+  input.addEventListener("input", () => {
+    if (nameEditor.activePlayerIndex < 0) return;
+
+    const nextValue = input.value.slice(0, MAX_PLAYER_NAME_LENGTH);
+    if (input.value !== nextValue) input.value = nextValue;
+    game.nameEditorNames[nameEditor.activePlayerIndex] = nextValue;
+  });
+
+  input.addEventListener("keydown", (event) => {
+    if (nameEditor.activePlayerIndex < 0) return;
+
+    if (event.key === "Enter") {
+      event.preventDefault();
+      commitPlayerName();
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      cancelPlayerName();
+      return;
+    }
+
+    if (event.key === "Tab") {
+      event.preventDefault();
+      const nextIndex = (nameEditor.activePlayerIndex + (event.shiftKey ? NAME_EDITOR_ROWS - 1 : 1)) % NAME_EDITOR_ROWS;
+      commitPlayerName({ shouldBlur: false });
+      beginEditingPlayerName(nextIndex, playerNameInputScreenRect(nextIndex), game.nameEditorNames[nextIndex] || "");
+    }
+  });
+
+  input.addEventListener("blur", () => {
+    if (nameEditor.suppressBlurCommit) {
+      nameEditor.suppressBlurCommit = false;
+      return;
+    }
+
+    commitPlayerName({ shouldBlur: false });
+  });
+
+  return nameEditor;
+}
+
+function positionNameEditor(screenRect) {
+  if (!nameEditor) return;
+
+  const { input } = nameEditor;
+  const fontSize = Math.max(12, Math.floor(screenRect.height * 0.56));
+  const horizontalPadding = Math.max(8, Math.floor(screenRect.height * 0.36));
+
+  Object.assign(input.style, {
+    display: "block",
+    left: `${Math.round(screenRect.left)}px`,
+    top: `${Math.round(screenRect.top)}px`,
+    width: `${Math.round(screenRect.width)}px`,
+    height: `${Math.round(screenRect.height)}px`,
+    padding: `0 ${horizontalPadding}px`,
+    font: `600 ${fontSize}px "Trebuchet MS", sans-serif`,
+  });
+}
+
+function hideNameEditor(shouldBlur = true) {
+  if (!nameEditor) return;
+
+  const { input } = nameEditor;
+  nameEditor.activePlayerIndex = -1;
+  game.editingNameIndex = -1;
+  input.style.display = "none";
+
+  if (shouldBlur && document.activeElement === input) {
+    nameEditor.suppressBlurCommit = true;
+    input.blur();
+  }
+}
+
+function beginEditingPlayerName(playerIndex, screenRect, initialValue) {
+  const editor = createNameEditor();
+  const nextIndex = clamp(playerIndex, 0, NAME_EDITOR_ROWS - 1);
+
+  if (editor.activePlayerIndex !== -1 && editor.activePlayerIndex !== nextIndex) {
+    commitPlayerName({ shouldBlur: false });
+  }
+
+  editor.activePlayerIndex = nextIndex;
+  game.editingNameIndex = nextIndex;
+  editor.input.value = (initialValue || "").slice(0, MAX_PLAYER_NAME_LENGTH);
+  game.nameEditorNames[nextIndex] = editor.input.value;
+
+  // A canvas surface cannot reliably summon the mobile keyboard by itself.
+  // This one real overlay input is the intentional cross-platform editing surface.
+  positionNameEditor(screenRect);
+
+  try {
+    editor.input.focus({ preventScroll: true });
+  } catch (error) {
+    editor.input.focus();
+  }
+
+  if (typeof editor.input.setSelectionRange === "function") {
+    const caret = editor.input.value.length;
+    editor.input.setSelectionRange(caret, caret);
+  }
+
+  game.message = `Editing ${game.savedPlayerNames[nextIndex] || `Player ${nextIndex + 1}`}. Tap outside or press Enter when you're done.`;
+}
+
+function commitPlayerName(options = {}) {
+  if (!nameEditor || nameEditor.activePlayerIndex < 0) return;
+
+  const { shouldBlur = true } = options;
+  const index = nameEditor.activePlayerIndex;
+  const nextValue = nameEditor.input.value.slice(0, MAX_PLAYER_NAME_LENGTH);
+  game.nameEditorNames[index] = nextValue;
+  nameEditor.input.value = nextValue;
+  persistEditedPlayerNames();
+  hideNameEditor(shouldBlur);
+  game.message = "Player names saved to local storage.";
+}
+
+function cancelPlayerName(options = {}) {
+  if (!nameEditor || nameEditor.activePlayerIndex < 0) return;
+
+  const { shouldBlur = true } = options;
+  const index = nameEditor.activePlayerIndex;
+  game.nameEditorNames[index] = game.savedPlayerNames[index] || defaultPlayerNames()[index];
+  hideNameEditor(shouldBlur);
+  game.message = "Name edit canceled.";
+}
+
+function saveEditedPlayerNames() {
+  if (nameEditor && nameEditor.activePlayerIndex >= 0) {
+    const index = nameEditor.activePlayerIndex;
+    game.nameEditorNames[index] = nameEditor.input.value.slice(0, MAX_PLAYER_NAME_LENGTH);
+    hideNameEditor(true);
+  }
+
+  persistEditedPlayerNames();
   game.screen = "menu";
   game.nameEditorNames = [];
-  nameEditorInput.value = "";
-  syncNameEditorInput(false);
   game.message = "Player names saved to local storage.";
 }
 
 function cancelEditedPlayerNames() {
+  if (nameEditor && nameEditor.activePlayerIndex >= 0) {
+    cancelPlayerName();
+  }
+
   game.screen = "menu";
   game.nameEditorNames = [];
-  nameEditorInput.value = "";
-  syncNameEditorInput(false);
+  game.editingNameIndex = -1;
   game.message = "Player names unchanged.";
 }
 
-nameEditorInput.addEventListener("input", () => {
-  if (game.screen !== "names") return;
+function syncNameEditorOverlay() {
+  if (!nameEditor || nameEditor.activePlayerIndex < 0) return;
 
-  const nextValue = nameEditorInput.value.slice(0, 16);
-  game.nameEditorNames[game.editingNameIndex] = nextValue;
-  if (nameEditorInput.value !== nextValue) {
-    nameEditorInput.value = nextValue;
-  }
-});
-
-nameEditorInput.addEventListener("keydown", (event) => {
-  if (game.screen !== "names") return;
-
-  if (event.key === "Tab") {
-    event.preventDefault();
-    activateNameField((game.editingNameIndex + (event.shiftKey ? 4 : 1)) % 5);
+  if (game.screen !== "names") {
+    hideNameEditor(true);
     return;
   }
 
-  if (event.key === "Enter") {
-    event.preventDefault();
-    saveEditedPlayerNames();
-    return;
-  }
-
-  if (event.key === "Escape") {
-    event.preventDefault();
-    cancelEditedPlayerNames();
-  }
-});
+  positionNameEditor(playerNameInputScreenRect(nameEditor.activePlayerIndex));
+}
 
 function sortByBoardOrder(cells) {
   return [...cells].sort((a, b) => (a.r - b.r) || (a.q - b.q));
@@ -1469,8 +1615,8 @@ function refreshButtons() {
 
   if (game.screen === "names") {
     buttons.push(fullButton);
-    for (let index = 0; index < 5; index += 1) {
-      buttons.push(makeButton(170, 72 + index * 32, 460, 26, game.nameEditorNames[index] || "", `nameField:${index}`, true, game.editingNameIndex === index));
+    for (let index = 0; index < NAME_EDITOR_ROWS; index += 1) {
+      buttons.push(makeButton(NAME_ROW_X, NAME_ROW_Y + index * 32, NAME_ROW_W, NAME_ROW_H, game.nameEditorNames[index] || "", `nameField:${index}`, true, game.editingNameIndex === index));
     }
     buttons.push(makeButton(172, 244, 140, 32, "Back", "cancelNames"));
     buttons.push(makeButton(330, 244, 140, 32, "Reset", "resetNames"));
@@ -1617,8 +1763,9 @@ function handleButton(button) {
   if (button.action === "openNames") {
     game.screen = "names";
     game.nameEditorNames = [...game.savedPlayerNames];
-    activateNameField(0);
-    game.message = "Select a player row, type a name, then save it to this browser.";
+    game.editingNameIndex = -1;
+    if (nameEditor) hideNameEditor(true);
+    game.message = "Tap a player row to edit its name, then tap outside when you're done.";
     return;
   }
 
@@ -1629,7 +1776,7 @@ function handleButton(button) {
 
   if (button.action === "resetNames") {
     game.nameEditorNames = defaultPlayerNames();
-    activateNameField(0);
+    if (nameEditor) hideNameEditor(true);
     game.message = "Names reset to the default player labels.";
     return;
   }
@@ -1640,7 +1787,8 @@ function handleButton(button) {
   }
 
   if (button.action.startsWith("nameField:")) {
-    activateNameField(Number(button.action.split(":")[1]));
+    const playerIndex = Number(button.action.split(":")[1]);
+    beginEditingPlayerName(playerIndex, playerNameInputScreenRect(playerIndex), game.nameEditorNames[playerIndex] || "");
     return;
   }
 
@@ -1780,8 +1928,29 @@ canvas.addEventListener("pointerdown", (event) => {
   const point = canvasPoint(event);
   refreshButtons();
   const button = buttonAt(point.x, point.y);
+
+  if (game.screen === "names" && nameEditor && nameEditor.activePlayerIndex >= 0) {
+    const activeFieldAction = `nameField:${nameEditor.activePlayerIndex}`;
+    if (!button || button.action !== activeFieldAction) {
+      const switchingFields = button && button.action.startsWith("nameField:");
+      commitPlayerName({ shouldBlur: !switchingFields });
+    }
+  }
+
+  if (game.screen === "names" && button && button.action.startsWith("nameField:")) {
+    const playerIndex = Number(button.action.split(":")[1]);
+    beginEditingPlayerName(playerIndex, playerNameInputScreenRect(playerIndex), game.nameEditorNames[playerIndex] || "");
+    refreshButtons();
+    return;
+  }
+
   if (button) {
     handleButton(button);
+    refreshButtons();
+    return;
+  }
+
+  if (game.screen === "names") {
     refreshButtons();
     return;
   }
@@ -1793,7 +1962,7 @@ canvas.addEventListener("pointerdown", (event) => {
 });
 
 window.addEventListener("keydown", (event) => {
-  if (game.screen === "names" && document.activeElement === nameEditorInput) {
+  if (game.screen === "names" && nameEditor && document.activeElement === nameEditor.input) {
     return;
   }
 
@@ -1813,14 +1982,6 @@ window.addEventListener("keydown", (event) => {
   }
 
   if (game.screen === "names") {
-    const currentValue = game.nameEditorNames[game.editingNameIndex] || "";
-
-    if (event.key === "Tab") {
-      event.preventDefault();
-      activateNameField((game.editingNameIndex + (event.shiftKey ? 4 : 1)) % 5, false);
-      return;
-    }
-
     if (event.key === "Enter") {
       saveEditedPlayerNames();
       return;
@@ -1831,21 +1992,12 @@ window.addEventListener("keydown", (event) => {
       return;
     }
 
-    if (event.key === "Backspace") {
-      game.nameEditorNames[game.editingNameIndex] = currentValue.slice(0, -1);
-      syncNameEditorInput(false);
-      return;
-    }
-
-    if (event.key === "Delete") {
-      game.nameEditorNames[game.editingNameIndex] = "";
-      syncNameEditorInput(false);
-      return;
-    }
-
-    if (event.key.length === 1 && currentValue.length < 16) {
-      game.nameEditorNames[game.editingNameIndex] = `${currentValue}${event.key}`;
-      syncNameEditorInput(false);
+    if (event.key === "Tab") {
+      event.preventDefault();
+      const nextIndex = game.editingNameIndex >= 0
+        ? (game.editingNameIndex + (event.shiftKey ? NAME_EDITOR_ROWS - 1 : 1)) % NAME_EDITOR_ROWS
+        : 0;
+      beginEditingPlayerName(nextIndex, playerNameInputScreenRect(nextIndex), game.nameEditorNames[nextIndex] || "");
     }
     return;
   }
@@ -2104,26 +2256,37 @@ function drawFullscreenIcon(button, enabled, hovered) {
   const bottom = button.y + button.h - pad;
   const inset = 4;
   const active = isFullscreenActive();
+  const centerX = (left + right) / 2;
+  const centerY = (top + bottom) / 2;
 
   ctx.strokeStyle = iconColor;
   ctx.lineWidth = 2;
   ctx.beginPath();
   if (active) {
-    ctx.moveTo(left, top + inset);
-    ctx.lineTo(left + inset, top + inset);
-    ctx.lineTo(left + inset, top);
+    const centerGapX = hovered ? 12 : 10;
+    const centerGapY = hovered ? 10 : 8;
+    const armX = hovered ? 4 : 3;
+    const armY = hovered ? 4 : 3;
+    const leftInnerX = Math.floor(centerX - centerGapX / 2);
+    const rightInnerX = Math.ceil(centerX + centerGapX / 2);
+    const topInnerY = Math.floor(centerY - centerGapY / 2);
+    const bottomInnerY = Math.ceil(centerY + centerGapY / 2);
 
-    ctx.moveTo(right - inset, top);
-    ctx.lineTo(right - inset, top + inset);
-    ctx.lineTo(right, top + inset);
+    ctx.moveTo(leftInnerX - armX, topInnerY);
+    ctx.lineTo(leftInnerX, topInnerY);
+    ctx.lineTo(leftInnerX, topInnerY - armY);
 
-    ctx.moveTo(left, bottom - inset);
-    ctx.lineTo(left + inset, bottom - inset);
-    ctx.lineTo(left + inset, bottom);
+    ctx.moveTo(rightInnerX, topInnerY - armY);
+    ctx.lineTo(rightInnerX, topInnerY);
+    ctx.lineTo(rightInnerX + armX, topInnerY);
 
-    ctx.moveTo(right - inset, bottom);
-    ctx.lineTo(right - inset, bottom - inset);
-    ctx.lineTo(right, bottom - inset);
+    ctx.moveTo(leftInnerX - armX, bottomInnerY);
+    ctx.lineTo(leftInnerX, bottomInnerY);
+    ctx.lineTo(leftInnerX, bottomInnerY + armY);
+
+    ctx.moveTo(rightInnerX, bottomInnerY + armY);
+    ctx.lineTo(rightInnerX, bottomInnerY);
+    ctx.lineTo(rightInnerX + armX, bottomInnerY);
   } else {
     ctx.moveTo(left + inset, top);
     ctx.lineTo(left, top);
@@ -2364,7 +2527,7 @@ function drawMenu() {
 function drawNameEditorScreen() {
   drawBackground();
   drawText("Change Player Names", WIDTH / 2, 40, 28, "#3c2b1a", "center", "700");
-  drawText("Click a row, type a name, and save it to this browser.", WIDTH / 2, 62, 13, "#5c4a31", "center", "500");
+  drawText("Tap or click a row to edit it. The keyboard opens through a real input overlay.", WIDTH / 2, 62, 13, "#5c4a31", "center", "500");
 
   ctx.fillStyle = "rgba(255, 249, 236, 0.86)";
   ctx.fillRect(132, 52, 536, 188);
@@ -2372,24 +2535,24 @@ function drawNameEditorScreen() {
   ctx.lineWidth = 2;
   ctx.strokeRect(132, 52, 536, 188);
 
-  for (let index = 0; index < 5; index += 1) {
-    const y = 72 + index * 32;
+  for (let index = 0; index < NAME_EDITOR_ROWS; index += 1) {
+    const y = NAME_ROW_Y + index * 32;
     const isActive = game.editingNameIndex === index;
     ctx.fillStyle = isActive ? "rgba(79, 127, 55, 0.16)" : "rgba(255, 252, 244, 0.95)";
-    ctx.fillRect(170, y, 460, 26);
+    ctx.fillRect(NAME_ROW_X, y, NAME_ROW_W, NAME_ROW_H);
     ctx.strokeStyle = isActive ? "#4f7f37" : "#a88f63";
     ctx.lineWidth = isActive ? 2.5 : 1.5;
-    ctx.strokeRect(170, y, 460, 26);
+    ctx.strokeRect(NAME_ROW_X, y, NAME_ROW_W, NAME_ROW_H);
 
     drawText(`Player ${index + 1}`, 184, y + 13, 11, PLAYER_COLORS[index], "left", "700");
 
     const name = game.nameEditorNames[index] || "";
-    const showCaret = isActive && Math.floor(Date.now() / 450) % 2 === 0;
+    const showCaret = isActive && (!nameEditor || nameEditor.activePlayerIndex !== index) && Math.floor(Date.now() / 450) % 2 === 0;
     const display = isActive && showCaret ? `${name}|` : name || "Type a name";
     drawText(display, 278, y + 13, 12, name ? "#3d2c17" : "#8a7a62", "left", name ? "600" : "500");
   }
 
-  drawText("Keyboard: type, Backspace deletes, Tab changes row, Enter saves.", WIDTH / 2, 224, 10, "#5d4a2f", "center", "500");
+  drawText("Enter commits. Tap outside to save that field. Save Names closes the editor.", WIDTH / 2, 224, 10, "#5d4a2f", "center", "500");
   game.uiButtons
     .filter((button) => !button.action.startsWith("nameField:"))
     .forEach(drawButton);
@@ -2488,6 +2651,7 @@ function drawPlayScreen() {
 
 function render() {
   refreshButtons();
+  syncNameEditorOverlay();
 
   if (game.screen === "menu") {
     drawMenu();
