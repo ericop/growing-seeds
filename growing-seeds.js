@@ -448,7 +448,7 @@ function terrainData(cell) {
 }
 
 function fullscreenElement() {
-  return document.fullscreenElement || document.webkitFullscreenElement || null;
+  return document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement || null;
 }
 
 function isFullscreenActive() {
@@ -456,7 +456,12 @@ function isFullscreenActive() {
 }
 
 function fullscreenSupported() {
-  return Boolean(canvas.requestFullscreen || canvas.webkitRequestFullscreen);
+  const target = document.documentElement;
+  return Boolean(
+    target.requestFullscreen
+    || target.webkitRequestFullscreen
+    || target.msRequestFullscreen,
+  );
 }
 
 function syncCanvasSize() {
@@ -480,46 +485,52 @@ function syncCanvasSize() {
   canvas.style.height = `${Math.floor(cssHeight)}px`;
 }
 
-function toggleFullscreen() {
+async function toggleFullscreen() {
   if (!fullscreenSupported()) {
     game.message = "Fullscreen is not available in this browser.";
     return;
   }
 
-  if (isFullscreenActive()) {
-    const exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen;
-    if (exitFullscreen) {
-      const result = exitFullscreen.call(document);
-      if (result && typeof result.catch === "function") {
-        result.catch(() => {
-          game.message = "Could not exit fullscreen.";
-        });
+  try {
+    if (fullscreenElement()) {
+      if (document.exitFullscreen) {
+        await document.exitFullscreen();
+        return;
       }
-    } else {
-      game.message = "Fullscreen exit is not available in this browser.";
-    }
-    return;
-  }
 
-  const requestFullscreen = canvas.requestFullscreen || canvas.webkitRequestFullscreen;
-  if (requestFullscreen === canvas.requestFullscreen) {
-    try {
-      const request = canvas.requestFullscreen({ navigationUI: "hide" });
-      if (request && typeof request.catch === "function") {
-        request.catch(() => {
-          game.message = "Fullscreen was blocked by the browser.";
-        });
+      if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+        return;
       }
-    } catch (error) {
-      const request = canvas.requestFullscreen();
-      if (request && typeof request.catch === "function") {
-        request.catch(() => {
-          game.message = "Fullscreen was blocked by the browser.";
-        });
+
+      if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+        return;
       }
+
+      game.message = "Fullscreen exit is not available in this browser.";
+      return;
     }
-  } else if (requestFullscreen) {
-    requestFullscreen.call(canvas);
+
+    const target = document.documentElement;
+    if (target.requestFullscreen) {
+      await target.requestFullscreen();
+      return;
+    }
+
+    if (target.webkitRequestFullscreen) {
+      target.webkitRequestFullscreen();
+      return;
+    }
+
+    if (target.msRequestFullscreen) {
+      target.msRequestFullscreen();
+      return;
+    }
+
+    game.message = "Fullscreen is not available in this browser.";
+  } catch (error) {
+    game.message = "Fullscreen toggle failed.";
   }
 }
 
