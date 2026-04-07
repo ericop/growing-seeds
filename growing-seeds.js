@@ -1678,10 +1678,10 @@ function refreshButtons() {
       buttons.push(makeButton(638, 10, 108, 22, "Main Menu", "openExitPrompt"));
       buttons.push(makeButton(16, 10, 82, 22, game.showScores ? "V Score" : "> Score", "toggleScores"));
       buttons.push(fullButton);
-      buttons.push(makeButton(PANEL_X + 10, 194, 132, 22, mustPlant ? "Plant First Seed" : "Plant Seed", ACTIONS.plant, canPlant, game.selectedAction === ACTIONS.plant));
-      buttons.push(makeButton(PANEL_X + 148, 194, 132, 22, `Grow x${growPreview.steps}`, ACTIONS.grow, !mustPlant && canGrow, game.selectedAction === ACTIONS.grow));
-      buttons.push(makeButton(PANEL_X + 10, 220, 132, 22, "Harvest", ACTIONS.harvest, !mustPlant && canHarvest));
-      buttons.push(makeButton(PANEL_X + 148, 220, 132, 22, game.turnState.mainAction === ACTIONS.grow && game.turnState.growSpent > 0 ? "Finish Grow" : "End Turn", ACTIONS.end, !mustPlant || (game.turnState.mainAction === ACTIONS.grow && game.turnState.growSpent > 0)));
+      buttons.push(makeButton(PANEL_X + 10, 184, 132, 22, mustPlant ? "Plant First Seed" : "Plant Seed", ACTIONS.plant, canPlant, game.selectedAction === ACTIONS.plant));
+      buttons.push(makeButton(PANEL_X + 148, 184, 132, 22, `Grow x${growPreview.steps}`, ACTIONS.grow, !mustPlant && canGrow, game.selectedAction === ACTIONS.grow));
+      buttons.push(makeButton(PANEL_X + 10, 210, 132, 22, "Harvest", ACTIONS.harvest, !mustPlant && canHarvest));
+      buttons.push(makeButton(PANEL_X + 148, 210, 132, 22, game.turnState.mainAction === ACTIONS.grow && game.turnState.growSpent > 0 ? "Finish Grow" : "End Turn", ACTIONS.end, !mustPlant || (game.turnState.mainAction === ACTIONS.grow && game.turnState.growSpent > 0)));
     }
   }
 
@@ -2089,6 +2089,35 @@ function drawText(text, x, y, size, color, align = "left", weight = "600") {
   ctx.fillText(text, x, y);
 }
 
+function wrapText(text, size, maxWidth, weight = "600") {
+  ctx.font = `${weight} ${size}px "Trebuchet MS", sans-serif`;
+
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines = [];
+  let currentLine = "";
+
+  words.forEach((word) => {
+    const candidate = currentLine ? `${currentLine} ${word}` : word;
+    if (!currentLine || ctx.measureText(candidate).width <= maxWidth) {
+      currentLine = candidate;
+    } else {
+      lines.push(currentLine);
+      currentLine = word;
+    }
+  });
+
+  if (currentLine) lines.push(currentLine);
+  return lines.length > 0 ? lines : [text];
+}
+
+function drawWrappedText(text, x, y, size, color, maxWidth, lineHeight, align = "left", weight = "600") {
+  const lines = wrapText(text, size, maxWidth, weight);
+  lines.forEach((line, index) => {
+    drawText(line, x, y + index * lineHeight, size, color, align, weight);
+  });
+  return lines.length;
+}
+
 function drawTerrainPattern(cell) {
   ctx.save();
   pathHex(cell.x, cell.y, BOARD.size - 1);
@@ -2141,6 +2170,99 @@ function drawDiamond(x, y, width, height, fill, edge) {
   ctx.stroke();
 }
 
+function lerpPoint(a, b, t) {
+  return {
+    x: a.x + (b.x - a.x) * t,
+    y: a.y + (b.y - a.y) * t,
+  };
+}
+
+function addPuzzleEdgeToPath(from, to, connector = 0, depth = 0) {
+  if (!connector || depth <= 0) {
+    ctx.lineTo(to.x, to.y);
+    return;
+  }
+
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.hypot(dx, dy);
+  const tangent = { x: dx / length, y: dy / length };
+  const outwardNormal = { x: tangent.y, y: -tangent.x };
+  const mid = lerpPoint(from, to, 0.5);
+  const span = length * 0.34;
+  const start = {
+    x: mid.x - tangent.x * span * 0.5,
+    y: mid.y - tangent.y * span * 0.5,
+  };
+  const end = {
+    x: mid.x + tangent.x * span * 0.5,
+    y: mid.y + tangent.y * span * 0.5,
+  };
+  const shoulderDepth = depth * 0.28 * connector;
+  const connectorTip = {
+    x: mid.x + outwardNormal.x * depth * connector,
+    y: mid.y + outwardNormal.y * depth * connector,
+  };
+
+  ctx.lineTo(start.x, start.y);
+  ctx.bezierCurveTo(
+    start.x + tangent.x * span * 0.16 + outwardNormal.x * shoulderDepth,
+    start.y + tangent.y * span * 0.16 + outwardNormal.y * shoulderDepth,
+    connectorTip.x - tangent.x * span * 0.18,
+    connectorTip.y - tangent.y * span * 0.18,
+    connectorTip.x,
+    connectorTip.y,
+  );
+  ctx.bezierCurveTo(
+    connectorTip.x + tangent.x * span * 0.18,
+    connectorTip.y + tangent.y * span * 0.18,
+    end.x - tangent.x * span * 0.16 + outwardNormal.x * shoulderDepth,
+    end.y - tangent.y * span * 0.16 + outwardNormal.y * shoulderDepth,
+    end.x,
+    end.y,
+  );
+  ctx.lineTo(to.x, to.y);
+}
+
+function buildPuzzlePiecePath(points, connectors, connectorDepth) {
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let index = 0; index < points.length; index += 1) {
+    const nextIndex = (index + 1) % points.length;
+    addPuzzleEdgeToPath(points[index], points[nextIndex], connectors[index] || 0, connectorDepth);
+  }
+  ctx.closePath();
+}
+
+function drawPuzzlePiece(points, connectors, fill, edge, lineWidth = 1.5, connectorDepth = 0) {
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const minX = Math.min(...xs) - connectorDepth;
+  const maxX = Math.max(...xs) + connectorDepth;
+  const minY = Math.min(...ys) - connectorDepth;
+  const maxY = Math.max(...ys) + connectorDepth;
+
+  buildPuzzlePiecePath(points, connectors, connectorDepth);
+  ctx.fillStyle = fill;
+  ctx.fill();
+
+  ctx.save();
+  buildPuzzlePiecePath(points, connectors, connectorDepth);
+  ctx.clip();
+  const sheen = ctx.createLinearGradient(minX, minY, maxX, maxY);
+  sheen.addColorStop(0, "rgba(255, 248, 234, 0.22)");
+  sheen.addColorStop(0.45, "rgba(255, 248, 234, 0.04)");
+  sheen.addColorStop(1, "rgba(61, 44, 23, 0.10)");
+  ctx.fillStyle = sheen;
+  ctx.fillRect(minX, minY, maxX - minX, maxY - minY);
+  ctx.restore();
+
+  buildPuzzlePiecePath(points, connectors, connectorDepth);
+  ctx.strokeStyle = edge;
+  ctx.lineWidth = lineWidth;
+  ctx.stroke();
+}
+
 function drawPolygon(points, fill, edge, lineWidth = 1.5) {
   ctx.beginPath();
   ctx.moveTo(points[0].x, points[0].y);
@@ -2155,12 +2277,13 @@ function drawPolygon(points, fill, edge, lineWidth = 1.5) {
   ctx.stroke();
 }
 
-function drawCompositeDnaHex(player, x, y, compact = false) {
+function drawCompositeDnaHex(player, x, y, compact = false, scale = 1) {
   if (!player || player.modules.length === 0) return;
 
-  const halfWidth = compact ? 13 : 18;
-  const band = compact ? 7 : 10;
+  const halfWidth = (compact ? 13 : 18) * scale;
+  const band = (compact ? 7 : 10) * scale;
   const seam = "#f4ead1";
+  const connectorDepth = (compact ? 3 : 4.5) * scale;
   const top = { x, y: y - band * 2 };
   const upperRight = { x: x + halfWidth, y: y - band };
   const lowerRight = { x: x + halfWidth, y: y + band };
@@ -2173,16 +2296,19 @@ function drawCompositeDnaHex(player, x, y, compact = false) {
     {
       moduleId: player.modules[0],
       points: [top, upperRight, center, upperLeft],
+      connectors: [0, -1, 1, 0],
       label: { x, y: y - band },
     },
     {
       moduleId: player.modules[1],
       points: [upperLeft, center, bottom, lowerLeft],
+      connectors: [-1, 1, 0, 0],
       label: { x: x - halfWidth / 2, y: y + band / 2 },
     },
     {
       moduleId: player.modules[2],
       points: [center, upperRight, lowerRight, bottom],
+      connectors: [1, 0, 0, -1],
       label: { x: x + halfWidth / 2, y: y + band / 2 },
     },
   ];
@@ -2190,7 +2316,7 @@ function drawCompositeDnaHex(player, x, y, compact = false) {
   pieces.forEach((piece) => {
     if (!piece.moduleId) return;
     const definition = moduleDef(piece.moduleId);
-    drawPolygon(piece.points, MODULE_TYPE_COLORS[definition.type], seam, compact ? 1.2 : 1.5);
+    drawPuzzlePiece(piece.points, piece.connectors, MODULE_TYPE_COLORS[definition.type], seam, compact ? 1.2 : 1.5, connectorDepth);
 
     const abbreviation = definition.name
       .split(" ")
@@ -2198,7 +2324,7 @@ function drawCompositeDnaHex(player, x, y, compact = false) {
       .join("")
       .slice(0, 2)
       .toUpperCase();
-    drawText(abbreviation, piece.label.x, piece.label.y, compact ? 7 : 9, "#fff8ea", "center", "700");
+    drawText(abbreviation, piece.label.x, piece.label.y, (compact ? 7 : 9) * scale, "#fff8ea", "center", "700");
   });
 }
 
@@ -2393,17 +2519,35 @@ function drawCompactScoreboard() {
   drawText(currentWeather().text, PANEL_X + 10, 66, 10, "#6d5a3d", "left", "500");
 
   ctx.fillStyle = "rgba(68, 123, 42, 0.12)";
-  ctx.fillRect(PANEL_X + 10, 76, 270, 34);
+  ctx.fillRect(PANEL_X + 10, 76, 270, 24);
   drawText(`Current: ${player.name}`, PANEL_X + 16, 88, 13, player.color, "left", "700");
-  drawText(`Produce ${player.produce} | Score ${player.score}`, PANEL_X + 16, 102, 10, "#4d3a24", "left", "600");
+  drawText(`Produce ${player.produce} | Score ${player.score}`, PANEL_X + 276, 88, 10, "#4d3a24", "right", "600");
 
-  drawText("Show Your DNA Modules", PANEL_X + 10, 126, 11, "#4a371e", "left", "700");
-  drawCompositeDnaHex(player, PANEL_X + 42, 142, true);
+  const dnaIconX = PANEL_X + 42;
+  const dnaIconY = 137;
+  drawCompositeDnaHex(player, dnaIconX, dnaIconY, true, 1.44);
+  drawText("DNA", dnaIconX, 173, 10, "#4a371e", "center", "700");
 
-  player.modules.forEach((moduleId, index) => {
+  let moduleTextY = 118;
+  const moduleTextX = PANEL_X + 72;
+  const moduleTextWidth = 204;
+  const moduleLineHeight = 10;
+  const moduleBlockGap = 2;
+
+  player.modules.forEach((moduleId) => {
     const definition = moduleDef(moduleId);
-    const y = 134 + index * 11;
-    drawText(`${definition.name}: ${definition.short}`, PANEL_X + 78, y, 8, MODULE_TYPE_COLORS[definition.type], "left", "700");
+    const lineCount = drawWrappedText(
+      `${definition.name}: ${definition.short}`,
+      moduleTextX,
+      moduleTextY,
+      10,
+      MODULE_TYPE_COLORS[definition.type],
+      moduleTextWidth,
+      moduleLineHeight,
+      "left",
+      "700",
+    );
+    moduleTextY += lineCount * moduleLineHeight + moduleBlockGap;
   });
 }
 
@@ -2613,11 +2757,11 @@ function drawEndScreen() {
   drawCompactScoreboard();
   drawLegendStrip();
 
-  ctx.fillStyle = "rgba(30, 22, 14, 0.78)";
-  ctx.fillRect(118, 34, 564, 172);
+  ctx.fillStyle = "rgba(20, 15, 10, 0.9)";
+  ctx.fillRect(118, 34, 564, 218);
   ctx.strokeStyle = "#efe2bf";
   ctx.lineWidth = 2;
-  ctx.strokeRect(118, 34, 564, 172);
+  ctx.strokeRect(118, 34, 564, 218);
 
   drawText("Harvest Complete", WIDTH / 2, 54, 26, "#f7efdb", "center", "700");
   drawText(game.winnerText, WIDTH / 2, 78, 15, "#f2d889", "center", "700");
