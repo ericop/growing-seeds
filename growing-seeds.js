@@ -58,35 +58,72 @@ const GAME_MODES = {
   advanced: "advanced",
 };
 
+const TERMS = {
+  moduleSingle: "DNA Module",
+  modulePlural: "DNA Modules",
+  seed: "DNA Seed",
+  garden: "Garden",
+  plants: "plants",
+  produce: "produce",
+  score: "score",
+};
+
+const MODULE_TYPE_LEGEND = [
+  { type: "growth", label: "Growth", text: "helps spread or auto-grow" },
+  { type: "production", label: "Production", text: "helps gain produce" },
+  { type: "sunlight", label: "Sunlight", text: "helps height or scoring" },
+  { type: "interaction", label: "Interaction", text: "affects neighbors or rivals" },
+];
+
 const TUTORIAL_STEPS = [
   {
     title: "Goal",
-    text: "Build your garden by placing DNA modules. Score the most points to win.",
+    lines: [
+      "Grow the strongest plants in the shared Garden.",
+      "Earn produce during the game and score the most points by the end.",
+    ],
     preview: "goal",
   },
   {
-    title: "Pick 3 Modules",
-    text: "Each turn, choose 3 DNA modules to combine into one hex.",
-    preview: "pick",
+    title: "DNA Modules",
+    lines: [
+      "Each turn you work with 3 DNA Modules.",
+      "Their mix shapes how your plants spread, harvest, score, or interact with rivals.",
+    ],
+    preview: "types",
   },
   {
-    title: "Build a Hex",
-    text: "Your 3 modules must connect edge-to-edge to form a single hex cluster.",
-    preview: "hex",
+    title: "Build a DNA Seed",
+    lines: [
+      "Your 3 DNA Modules combine into 1 DNA Seed.",
+      "This is the shape you plant into the Garden.",
+    ],
+    preview: "seed",
   },
   {
-    title: "Plant Your Hex",
-    text: "Place your hex onto the board. It must connect to your existing garden.",
+    title: "Plant Seed",
+    lines: [
+      "Choose Plant Seed when you want to start a new placement in the Garden.",
+      "Use Plant Seed to expand your plants in the Garden and introduce new module powers.",
+    ],
     preview: "plant",
+    hint: "Plant = add a new DNA Seed",
   },
   {
     title: "Growth",
-    text: "Some modules trigger effects when placed, helping your garden grow.",
+    lines: [
+      "Choose Grow when you want your existing plants to spread farther.",
+      "Use Grow when your current powers, position, or height advantage are worth extending.",
+    ],
     preview: "growth",
+    hint: "Grow = extend plants already in the Garden",
   },
   {
-    title: "Winning",
-    text: "Score points from your placements. Highest score wins.",
+    title: "Harvest and Winning",
+    lines: [
+      "Harvest converts your plants and terrain into produce.",
+      "At game end, score includes module bonuses, so win by balancing expansion, growth, produce, and scoring.",
+    ],
     preview: "win",
   },
 ];
@@ -139,14 +176,14 @@ const MODULES = {
     name: "North Surge",
     type: "growth",
     short: "Auto-grow north at turn end.",
-    detail: "At the end of your turn, auto-grow 1 hex north from one of your eligible plant hexes if possible.",
+    detail: "At the end of your turn, auto-grow 1 space north from one of your eligible plants in the Garden if possible.",
   },
   branchSplitter: {
     id: "branchSplitter",
     name: "Branch Splitter",
     type: "growth",
     short: "Manual grow may hit 2 targets.",
-    detail: "When you take a manual grow action, you may grow into up to 2 legal adjacent hexes instead of 1.",
+    detail: "When you take a manual grow action, you may grow into up to 2 legal adjacent spaces instead of 1.",
   },
   creepingCarpet: {
     id: "creepingCarpet",
@@ -167,7 +204,7 @@ const MODULES = {
     name: "Diagonal Bloom",
     type: "growth",
     short: "Every other turn, auto-grow on angled lanes.",
-    detail: "Every other turn, after your normal action, auto-grow 1 diagonal-like neighboring hex if legal.",
+    detail: "Every other turn, after your normal action, auto-grow 1 diagonal neighboring space if legal.",
   },
   doubleSeedPod: {
     id: "doubleSeedPod",
@@ -180,8 +217,8 @@ const MODULES = {
     id: "nutrientHoarder",
     name: "Nutrient Hoarder",
     type: "production",
-    short: "+1 harvest per 3 connected visible hexes.",
-    detail: "Gain +1 produce for every 3 connected visible hexes you control, rounded down, when you harvest.",
+    short: "+1 harvest per 3 connected visible plants.",
+    detail: "Gain +1 produce for every 3 connected visible plants you control, rounded down, when you harvest.",
   },
   earlySprouter: {
     id: "earlySprouter",
@@ -201,29 +238,29 @@ const MODULES = {
     id: "sunCollector",
     name: "Sun Collector",
     type: "sunlight",
-    short: "Visible top hexes score +1 more.",
-    detail: "Each of your visible topmost hexes is worth +1 extra victory point at end game.",
+    short: "Visible top plants score +1 more.",
+    detail: "Each of your visible topmost plants is worth +1 extra victory point at end game.",
   },
   skyBloom: {
     id: "skyBloom",
     name: "Sky Bloom",
     type: "sunlight",
-    short: "Height 3+ hexes make produce.",
-    detail: "Each of your hexes at height 3 or more gives +1 produce at the end of your turn.",
+    short: "Height 3+ plants make produce.",
+    detail: "Each of your plants at height 3 or more gives +1 produce at the end of your turn.",
   },
   thornBarrier: {
     id: "thornBarrier",
     name: "Thorn Barrier",
     type: "interaction",
     short: "Adjacent enemy growth costs +1.",
-    detail: "Opponents must spend 1 extra produce to grow into a hex adjacent to one of your plant hexes.",
+    detail: "Opponents must spend 1 extra produce to grow into a space adjacent to one of your plants in the Garden.",
   },
   southSurge: {
     id: "southSurge",
     name: "South Surge",
     type: "growth",
     short: "Auto-grow south at turn end.",
-    detail: "At the end of your turn, auto-grow 1 hex south from one of your existing eligible plant hexes if possible.",
+    detail: "At the end of your turn, auto-grow 1 space south from one of your existing eligible plants in the Garden if possible.",
   },
   sunwardClimb: {
     id: "sunwardClimb",
@@ -237,14 +274,14 @@ const MODULES = {
     name: "Spiral Bloom",
     type: "growth",
     short: "Auto-grow using rotating direction priority.",
-    detail: "At the end of your turn, auto-grow 1 hex in a rotating clockwise direction priority if legal.",
+    detail: "At the end of your turn, auto-grow 1 space using rotating clockwise direction priority if legal.",
   },
   windDrift: {
     id: "windDrift",
     name: "Wind Drift",
     type: "growth",
     short: "50% chance to auto-grow randomly.",
-    detail: "At the end of your turn, there is a 50% chance to auto-grow into a random legal adjacent hex.",
+    detail: "At the end of your turn, there is a 50% chance to auto-grow into a random legal adjacent space.",
   },
   efficientRoots: {
     id: "efficientRoots",
@@ -258,14 +295,14 @@ const MODULES = {
     name: "Overproducer",
     type: "production",
     short: "Every 3rd turn, gain visible-column produce.",
-    detail: "Every 3rd turn, gain bonus produce equal to floor(your visible hex count divided by 3).",
+    detail: "Every 3rd turn, gain bonus produce equal to floor(your visible plant count divided by 3).",
   },
   sporeBurst: {
     id: "sporeBurst",
     name: "Spore Burst",
     type: "production",
     short: "Harvest triggers 1 extra auto-grow.",
-    detail: "Whenever you harvest, auto-grow 1 legal adjacent hex if possible.",
+    detail: "Whenever you harvest, auto-grow 1 legal adjacent space if possible.",
   },
   seedVault: {
     id: "seedVault",
@@ -278,29 +315,29 @@ const MODULES = {
     id: "shadeTolerant",
     name: "Shade Tolerant",
     type: "sunlight",
-    short: "Covered hexes still score a little.",
-    detail: "Covered lower-height hexes still matter: score +1 point per 2 covered hexes at end game.",
+    short: "Covered plants still score a little.",
+    detail: "Covered lower plants still matter: score +1 point per 2 covered plants at end game.",
   },
   canopyDominance: {
     id: "canopyDominance",
     name: "Canopy Dominance",
     type: "sunlight",
     short: "Top columns over rivals score bonus points.",
-    detail: "If one of your hexes is above an opponent in the same column, gain +1 end-game point for that column.",
+    detail: "If one of your plants is above an opponent in the same column, gain +1 end-game point for that column.",
   },
   symbiosis: {
     id: "symbiosis",
     name: "Symbiosis",
     type: "interaction",
     short: "Shared borders help harvests.",
-    detail: "For each of your hexes adjacent to an opponent hex, both sides benefit during harvest, capped for readability.",
+    detail: "For each of your plants adjacent to an opponent plant, both sides benefit during harvest, capped for readability.",
   },
   allelopathy: {
     id: "allelopathy",
     name: "Allelopathy",
     type: "interaction",
     short: "Adjacent enemy harvests lose 1.",
-    detail: "Opponent hexes adjacent to your hexes produce 1 less produce during harvest, minimum 0.",
+    detail: "Opponent plants adjacent to your plants produce 1 less produce during harvest, minimum 0.",
   },
 };
 
@@ -386,7 +423,7 @@ const game = {
   hoverButton: null,
   hoverModuleId: null,
   uiButtons: [],
-  message: "Choose a player count and DNA set.",
+  message: `Choose a player count and ${TERMS.modulePlural}.`,
   tutorialOpen: false,
   tutorialStep: 0,
   lastAction: "",
@@ -1152,7 +1189,7 @@ function placeSeedInCell(player, cell) {
     spendProduce(player, 2);
   }
   addUnitToCell(player, cell, true);
-  game.lastAction = extraSeed ? "Planted an extra seed hub." : "Planted the first seed hub.";
+  game.lastAction = extraSeed ? `Planted an extra ${TERMS.seed}.` : `Planted the first ${TERMS.seed}.`;
   return true;
 }
 
@@ -1501,7 +1538,7 @@ function beginDraft() {
     active: true,
     playerId: game.currentPlayer,
   };
-  game.message = `${currentPlayer().name}, pass the device and press OK to begin drafting.`;
+  game.message = `${currentPlayer().name}, pass the device and press OK to begin choosing ${TERMS.modulePlural}.`;
 }
 
 function startGameFromDraft() {
@@ -1511,7 +1548,7 @@ function startGameFromDraft() {
   game.selectedAction = null;
   game.hoverCell = null;
   game.hoverModuleId = null;
-  game.lastAction = "DNA draft complete.";
+  game.lastAction = `${TERMS.modulePlural} ready.`;
   game.nextUnitId = 1;
   game.exitPrompt.active = false;
   game.passPrompt = {
@@ -1539,7 +1576,7 @@ function draftModule(moduleId) {
     active: true,
     playerId: game.currentPlayer,
   };
-  game.message = `${currentPlayer().name}, pass the device and press OK for the next draft pick.`;
+  game.message = `${currentPlayer().name}, pass the device and press OK for the next ${TERMS.moduleSingle}.`;
 }
 
 function prepareTurn(player) {
@@ -1559,7 +1596,7 @@ function prepareTurn(player) {
 
   if (hasModule(player, "efficientRoots") && player.turnsTaken % 2 === 0) {
     player.bonusGrowSteps += 1;
-    notes.push("Efficient Roots stored +1 grow step");
+    notes.push("Efficient Roots stored +1 grow action");
   }
 
   if (hasModule(player, "overproducer") && player.turnsTaken % 3 === 0) {
@@ -1578,7 +1615,7 @@ function prepareTurn(player) {
   recomputeScores();
 
   const base = forcedSeedTurn(player)
-    ? `${player.name}: place your first seed hub.`
+    ? `${player.name}: plant your first ${TERMS.seed}.`
     : `${player.name}'s turn. Choose one main action.`;
   game.message = notes.length > 0 ? `${base} Start effects: ${notes.join("; ")}.` : base;
 }
@@ -1660,9 +1697,9 @@ function refreshButtons() {
       buttons.push(makeButton(182 + index * 108, 174, 88, 34, `${count} Players`, `players:${count}`, true, game.playerCount === count));
     });
 
+    buttons.push(makeButton(614, 126, 148, 34, "How to Play", "openTutorial"));
     buttons.push(makeButton(614, 174, 148, 34, "Change Names", "openNames"));
     buttons.push(makeButton(300, 222, 200, 38, "Begin DNA Draft", "beginDraft"));
-    buttons.push(makeButton(614, 222, 148, 38, "How to Play", "openTutorial"));
   }
 
   if (game.screen === "names") {
@@ -1793,7 +1830,7 @@ function handleButton(button) {
   if (button.action === "cancelExit") {
     game.exitPrompt.active = false;
     game.message = game.screen === "draft"
-      ? `${currentPlayer().name}: draft module ${currentPlayer().modules.length + 1} of 3.`
+      ? `${currentPlayer().name}: choose ${TERMS.moduleSingle} ${currentPlayer().modules.length + 1} of 3.`
       : `${currentPlayer().name}'s game is still in progress.`;
     return;
   }
@@ -1807,25 +1844,25 @@ function handleButton(button) {
     game.availableModules = [];
     game.hoverCell = null;
     game.hoverModuleId = null;
-    game.message = "Choose a player count and DNA set.";
+    game.message = `Choose a player count and ${TERMS.modulePlural}.`;
     return;
   }
 
   if (button.action === "toggleScores") {
     game.showScores = !game.showScores;
     game.message = game.showScores
-      ? "Player scores are shown above the board."
-      : "Player scores are hidden to keep the board clear.";
+      ? `Scores are shown above the ${TERMS.garden.toLowerCase()}.`
+      : `Scores are hidden to keep the ${TERMS.garden.toLowerCase()} clear.`;
     return;
   }
 
   if (button.action === "handoffOk") {
     game.passPrompt.active = false;
     if (game.screen === "draft") {
-      game.message = `${currentPlayer().name}: draft module ${currentPlayer().modules.length + 1} of 3.`;
+      game.message = `${currentPlayer().name}: choose ${TERMS.moduleSingle} ${currentPlayer().modules.length + 1} of 3.`;
     } else {
       game.message = forcedSeedTurn(currentPlayer())
-        ? `${currentPlayer().name}: place your first seed hub.`
+        ? `${currentPlayer().name}: plant your first ${TERMS.seed}.`
         : `${currentPlayer().name}'s turn. Choose one main action.`;
     }
     return;
@@ -1838,7 +1875,7 @@ function handleButton(button) {
     game.availableModules = [];
     game.hoverCell = null;
     game.hoverModuleId = null;
-    game.message = "Choose a player count and DNA set.";
+    game.message = `Choose a player count and ${TERMS.modulePlural}.`;
     return;
   }
 
@@ -1921,8 +1958,8 @@ function handleButton(button) {
     game.selectedAction = ACTIONS.plant;
     game.turnState.mainAction = ACTIONS.plant;
     game.message = hasAnyPlant(player.id)
-      ? "Click an empty adjacent column to place a seed hub for 2 produce."
-      : "Click any empty column to place your first seed hub.";
+      ? `Click an empty adjacent space to plant a new ${TERMS.seed} for 2 ${TERMS.produce}.`
+      : `Click any empty space to plant your first ${TERMS.seed}.`;
     return;
   }
 
@@ -2116,18 +2153,18 @@ window.addEventListener("keydown", (event) => {
     if (game.exitPrompt.active) {
       if (event.key === "Escape") {
         game.exitPrompt.active = false;
-        game.message = `${currentPlayer().name}: draft module ${currentPlayer().modules.length + 1} of 3.`;
+        game.message = `${currentPlayer().name}: choose ${TERMS.moduleSingle} ${currentPlayer().modules.length + 1} of 3.`;
       }
       return;
     }
     if (game.passPrompt.active && (event.key === "Enter" || event.key === " ")) {
       game.passPrompt.active = false;
-      game.message = `${currentPlayer().name}: draft module ${currentPlayer().modules.length + 1} of 3.`;
+      game.message = `${currentPlayer().name}: choose ${TERMS.moduleSingle} ${currentPlayer().modules.length + 1} of 3.`;
       return;
     }
     if (event.key.toLowerCase() === "r") {
       game.screen = "menu";
-      game.message = "Choose a player count and DNA set.";
+      game.message = `Choose a player count and ${TERMS.modulePlural}.`;
     }
     return;
   }
@@ -2149,7 +2186,7 @@ window.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") {
       game.passPrompt.active = false;
       game.message = forcedSeedTurn(currentPlayer())
-        ? `${currentPlayer().name}: place your first seed hub.`
+        ? `${currentPlayer().name}: plant your first ${TERMS.seed}.`
         : `${currentPlayer().name}'s turn. Choose one main action.`;
     }
     return;
@@ -2161,7 +2198,7 @@ window.addEventListener("keydown", (event) => {
   if (event.key === "4") handleButton(makeButton(0, 0, 0, 0, "", ACTIONS.end));
   if (event.key.toLowerCase() === "r") {
     game.screen = "menu";
-    game.message = "Choose a player count and DNA set.";
+    game.message = `Choose a player count and ${TERMS.modulePlural}.`;
   }
 });
 
@@ -2234,6 +2271,62 @@ function tutorialPreviewPlayer() {
   };
 }
 
+function drawDnaSeed(player, x, y, compact = false, scale = 1) {
+  if (!player || player.modules.length === 0) return;
+
+  const halfWidth = (compact ? 13 : 18) * scale;
+  const band = (compact ? 7 : 10) * scale;
+  const seam = "#f4ead1";
+  const connectorDepth = (compact ? 3 : 4.5) * scale;
+  const top = { x, y: y - band * 2 };
+  const upperRight = { x: x + halfWidth, y: y - band };
+  const lowerRight = { x: x + halfWidth, y: y + band };
+  const bottom = { x, y: y + band * 2 };
+  const lowerLeft = { x: x - halfWidth, y: y + band };
+  const upperLeft = { x: x - halfWidth, y: y - band };
+  const center = { x, y };
+
+  const pieces = [
+    {
+      moduleId: player.modules[0],
+      points: [top, upperRight, center, upperLeft],
+      connectors: [0, -1, 1, 0],
+      label: { x, y: y - band },
+    },
+    {
+      moduleId: player.modules[1],
+      points: [upperLeft, center, bottom, lowerLeft],
+      connectors: [-1, 1, 0, 0],
+      label: { x: x - halfWidth / 2, y: y + band / 2 },
+    },
+    {
+      moduleId: player.modules[2],
+      points: [center, upperRight, lowerRight, bottom],
+      connectors: [1, 0, 0, -1],
+      label: { x: x + halfWidth / 2, y: y + band / 2 },
+    },
+  ];
+
+  pieces.forEach((piece) => {
+    if (!piece.moduleId) return;
+    const definition = moduleDef(piece.moduleId);
+    drawPuzzlePiece(piece.points, piece.connectors, MODULE_TYPE_COLORS[definition.type], seam, compact ? 1.2 : 1.5, connectorDepth);
+
+    const abbreviation = definition.name
+      .split(" ")
+      .map((word) => word[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+    drawText(abbreviation, piece.label.x, piece.label.y, (compact ? 7 : 9) * scale, "#fff8ea", "center", "700");
+  });
+}
+
+// TODO: Keep this wrapper while some internal drawing call sites still use the older name.
+function drawCompositeDnaHex(player, x, y, compact = false, scale = 1) {
+  drawDnaSeed(player, x, y, compact, scale);
+}
+
 function currentTutorialStep() {
   return TUTORIAL_STEPS[clamp(game.tutorialStep, 0, TUTORIAL_STEPS.length - 1)];
 }
@@ -2248,7 +2341,7 @@ function drawTutorialPreview() {
   ctx.strokeRect(TUTORIAL_PREVIEW_X, TUTORIAL_PREVIEW_Y, TUTORIAL_PREVIEW_W, TUTORIAL_PREVIEW_H);
 
   if (step.preview === "goal") {
-    drawCompositeDnaHex(tutorialPreviewPlayer(), TUTORIAL_PREVIEW_X + 34, TUTORIAL_PREVIEW_Y + 34, true, 1.1);
+    drawDnaSeed(tutorialPreviewPlayer(), TUTORIAL_PREVIEW_X + 34, TUTORIAL_PREVIEW_Y + 34, true, 1.1);
     pathHex(TUTORIAL_PREVIEW_X + 92, TUTORIAL_PREVIEW_Y + 46, 12);
     ctx.fillStyle = "rgba(198, 220, 139, 0.95)";
     ctx.fill();
@@ -2259,35 +2352,55 @@ function drawTutorialPreview() {
     return;
   }
 
-  if (step.preview === "pick") {
-    const sampleModules = ["branchSplitter", "tallStalk", "doubleSeedPod"];
-    sampleModules.forEach((moduleId, index) => {
-      const fill = MODULE_TYPE_COLORS[moduleDef(moduleId).type];
-      const tileX = TUTORIAL_PREVIEW_X + 12 + (index % 2) * 56;
-      const tileY = TUTORIAL_PREVIEW_Y + 12 + Math.floor(index / 2) * 30;
-      ctx.fillStyle = fill;
-      ctx.fillRect(tileX, tileY, 48, 22);
+  if (step.preview === "types") {
+    MODULE_TYPE_LEGEND.forEach((entry, index) => {
+      const row = index % 2;
+      const col = Math.floor(index / 2);
+      const chipX = TUTORIAL_PREVIEW_X + 10 + col * 62;
+      const chipY = TUTORIAL_PREVIEW_Y + 12 + row * 30;
+
+      ctx.fillStyle = MODULE_TYPE_COLORS[entry.type];
+      ctx.fillRect(chipX, chipY, 54, 18);
       ctx.strokeStyle = "#f4ead1";
       ctx.lineWidth = 2;
-      ctx.strokeRect(tileX, tileY, 48, 22);
-      drawText(moduleDef(moduleId).name.split(" ")[0], tileX + 24, tileY + 11, 8, "#fff8ea", "center", "700");
+      ctx.strokeRect(chipX, chipY, 54, 18);
+      drawText(entry.label, chipX + 27, chipY + 9, 7, "#fff8ea", "center", "700");
+      drawText(entry.text, chipX + 27, chipY + 24, 6, "#5a482e", "center", "500");
     });
     return;
   }
 
-  if (step.preview === "hex") {
-    drawCompositeDnaHex(tutorialPreviewPlayer(), TUTORIAL_PREVIEW_X + 66, TUTORIAL_PREVIEW_Y + 40, true, 1.35);
+  if (step.preview === "seed") {
+    const sampleModules = ["branchSplitter", "tallStalk", "doubleSeedPod"];
+    sampleModules.forEach((moduleId, index) => {
+      const fill = MODULE_TYPE_COLORS[moduleDef(moduleId).type];
+      const tileX = TUTORIAL_PREVIEW_X + 8 + index * 20;
+      const tileY = TUTORIAL_PREVIEW_Y + 14 + (index % 2) * 16;
+      ctx.fillStyle = fill;
+      ctx.fillRect(tileX, tileY, 22, 14);
+      ctx.strokeStyle = "#f4ead1";
+      ctx.lineWidth = 1.6;
+      ctx.strokeRect(tileX, tileY, 22, 14);
+    });
+    ctx.beginPath();
+    ctx.moveTo(TUTORIAL_PREVIEW_X + 54, TUTORIAL_PREVIEW_Y + 34);
+    ctx.lineTo(TUTORIAL_PREVIEW_X + 74, TUTORIAL_PREVIEW_Y + 34);
+    ctx.lineTo(TUTORIAL_PREVIEW_X + 68, TUTORIAL_PREVIEW_Y + 28);
+    ctx.moveTo(TUTORIAL_PREVIEW_X + 74, TUTORIAL_PREVIEW_Y + 34);
+    ctx.lineTo(TUTORIAL_PREVIEW_X + 68, TUTORIAL_PREVIEW_Y + 40);
     ctx.strokeStyle = "#d4a332";
     ctx.lineWidth = 2;
-    ctx.strokeRect(TUTORIAL_PREVIEW_X + 20, TUTORIAL_PREVIEW_Y + 12, 92, 56);
+    ctx.stroke();
+    drawDnaSeed(tutorialPreviewPlayer(), TUTORIAL_PREVIEW_X + 98, TUTORIAL_PREVIEW_Y + 38, true, 1.12);
+    drawText(TERMS.seed, TUTORIAL_PREVIEW_X + 98, TUTORIAL_PREVIEW_Y + 66, 8, "#4a371e", "center", "700");
     return;
   }
 
   if (step.preview === "plant") {
     [
-      { x: TUTORIAL_PREVIEW_X + 36, y: TUTORIAL_PREVIEW_Y + 28 },
-      { x: TUTORIAL_PREVIEW_X + 58, y: TUTORIAL_PREVIEW_Y + 40 },
-      { x: TUTORIAL_PREVIEW_X + 80, y: TUTORIAL_PREVIEW_Y + 28 },
+      { x: TUTORIAL_PREVIEW_X + 34, y: TUTORIAL_PREVIEW_Y + 30 },
+      { x: TUTORIAL_PREVIEW_X + 56, y: TUTORIAL_PREVIEW_Y + 42 },
+      { x: TUTORIAL_PREVIEW_X + 78, y: TUTORIAL_PREVIEW_Y + 30 },
     ].forEach((cell) => {
       pathHex(cell.x, cell.y, 11);
       ctx.fillStyle = "rgba(255, 249, 236, 0.95)";
@@ -2296,52 +2409,73 @@ function drawTutorialPreview() {
       ctx.lineWidth = 1.8;
       ctx.stroke();
     });
-    drawCompositeDnaHex(tutorialPreviewPlayer(), TUTORIAL_PREVIEW_X + 84, TUTORIAL_PREVIEW_Y + 46, true, 0.9);
+    drawDnaSeed(tutorialPreviewPlayer(), TUTORIAL_PREVIEW_X + 90, TUTORIAL_PREVIEW_Y + 46, true, 0.92);
     ctx.strokeStyle = "#4f7f37";
     ctx.lineWidth = 2;
-    ctx.strokeRect(TUTORIAL_PREVIEW_X + 18, TUTORIAL_PREVIEW_Y + 58, 96, 16);
-    drawText("Plant", TUTORIAL_PREVIEW_X + 66, TUTORIAL_PREVIEW_Y + 66, 8, "#4f7f37", "center", "700");
+    ctx.strokeRect(TUTORIAL_PREVIEW_X + 16, TUTORIAL_PREVIEW_Y + 58, 100, 16);
+    drawText("Plant Seed", TUTORIAL_PREVIEW_X + 66, TUTORIAL_PREVIEW_Y + 66, 8, "#4f7f37", "center", "700");
     return;
   }
 
   if (step.preview === "growth") {
-    ctx.fillStyle = "rgba(79, 127, 55, 0.14)";
-    ctx.fillRect(TUTORIAL_PREVIEW_X + 18, TUTORIAL_PREVIEW_Y + 50, 96, 18);
-    ctx.strokeStyle = "#4f7f37";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(TUTORIAL_PREVIEW_X + 18, TUTORIAL_PREVIEW_Y + 50, 96, 18);
-    drawText("Grow x1", TUTORIAL_PREVIEW_X + 66, TUTORIAL_PREVIEW_Y + 59, 9, "#4f7f37", "center", "700");
+    [
+      { x: TUTORIAL_PREVIEW_X + 26, y: TUTORIAL_PREVIEW_Y + 44 },
+      { x: TUTORIAL_PREVIEW_X + 48, y: TUTORIAL_PREVIEW_Y + 56 },
+      { x: TUTORIAL_PREVIEW_X + 70, y: TUTORIAL_PREVIEW_Y + 44 },
+      { x: TUTORIAL_PREVIEW_X + 92, y: TUTORIAL_PREVIEW_Y + 56 },
+    ].forEach((cell, index) => {
+      pathHex(cell.x, cell.y, 10);
+      ctx.fillStyle = index < 3 ? "rgba(79, 127, 55, 0.22)" : "rgba(255, 249, 236, 0.95)";
+      ctx.fill();
+      ctx.strokeStyle = index < 3 ? "#4f7f37" : "#b79e74";
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
+    });
     ctx.beginPath();
-    ctx.moveTo(TUTORIAL_PREVIEW_X + 66, TUTORIAL_PREVIEW_Y + 44);
-    ctx.lineTo(TUTORIAL_PREVIEW_X + 66, TUTORIAL_PREVIEW_Y + 26);
-    ctx.lineTo(TUTORIAL_PREVIEW_X + 60, TUTORIAL_PREVIEW_Y + 32);
-    ctx.moveTo(TUTORIAL_PREVIEW_X + 66, TUTORIAL_PREVIEW_Y + 26);
-    ctx.lineTo(TUTORIAL_PREVIEW_X + 72, TUTORIAL_PREVIEW_Y + 32);
+    ctx.moveTo(TUTORIAL_PREVIEW_X + 76, TUTORIAL_PREVIEW_Y + 50);
+    ctx.lineTo(TUTORIAL_PREVIEW_X + 90, TUTORIAL_PREVIEW_Y + 56);
+    ctx.lineTo(TUTORIAL_PREVIEW_X + 83, TUTORIAL_PREVIEW_Y + 48);
+    ctx.moveTo(TUTORIAL_PREVIEW_X + 90, TUTORIAL_PREVIEW_Y + 56);
+    ctx.lineTo(TUTORIAL_PREVIEW_X + 81, TUTORIAL_PREVIEW_Y + 58);
     ctx.strokeStyle = "#d4a332";
     ctx.lineWidth = 2.2;
     ctx.stroke();
+    drawText("Grow", TUTORIAL_PREVIEW_X + 34, TUTORIAL_PREVIEW_Y + 20, 9, "#4f7f37", "left", "700");
     return;
   }
 
   ctx.fillStyle = "rgba(68, 123, 42, 0.12)";
   ctx.fillRect(TUTORIAL_PREVIEW_X + 16, TUTORIAL_PREVIEW_Y + 18, 100, 18);
-  drawText("Score 12", TUTORIAL_PREVIEW_X + 66, TUTORIAL_PREVIEW_Y + 27, 10, "#4d3a24", "center", "700");
-  drawText("Highest wins", TUTORIAL_PREVIEW_X + 66, TUTORIAL_PREVIEW_Y + 54, 9, "#5d4a2f", "center", "600");
+  drawText("Produce 6", TUTORIAL_PREVIEW_X + 66, TUTORIAL_PREVIEW_Y + 27, 10, "#4d3a24", "center", "700");
+  drawText("Score 12", TUTORIAL_PREVIEW_X + 66, TUTORIAL_PREVIEW_Y + 45, 10, "#4d3a24", "center", "700");
+  drawText("Highest score wins", TUTORIAL_PREVIEW_X + 66, TUTORIAL_PREVIEW_Y + 63, 8, "#5d4a2f", "center", "600");
 }
 
 function drawTutorialOverlay() {
   const step = currentTutorialStep();
   const bodyX = TUTORIAL_PANEL_X + 176;
-  const bodyY = TUTORIAL_PANEL_Y + 76;
+  const bodyY = TUTORIAL_PANEL_Y + 74;
   const bodyWidth = 288;
 
   ctx.fillStyle = "rgba(18, 13, 8, 0.74)";
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-  if (game.screen === "menu" && game.tutorialStep === 0) {
+  if (game.screen === "menu" && game.tutorialStep <= 1) {
     ctx.strokeStyle = "#d4a332";
     ctx.lineWidth = 3;
     ctx.strokeRect(300, 222, 200, 38);
+  }
+
+  if (game.screen === "play" && step.preview === "plant") {
+    ctx.strokeStyle = "#d4a332";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(PANEL_X + 10, 184, 132, 22);
+  }
+
+  if (game.screen === "play" && step.preview === "growth") {
+    ctx.strokeStyle = "#d4a332";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(PANEL_X + 148, 184, 132, 22);
   }
 
   ctx.fillStyle = "rgba(255, 249, 236, 0.98)";
@@ -2352,7 +2486,12 @@ function drawTutorialOverlay() {
 
   drawText(`How to Play  ${game.tutorialStep + 1}/${TUTORIAL_STEPS.length}`, WIDTH / 2, TUTORIAL_PANEL_Y + 24, 14, "#4a371e", "center", "700");
   drawText(step.title, bodyX, TUTORIAL_PANEL_Y + 48, 22, "#3c2b1a", "left", "700");
-  drawWrappedText(step.text, bodyX, bodyY, 13, "#5a482e", bodyWidth, 18, "left", "600");
+  step.lines.forEach((line, index) => {
+    drawWrappedText(line, bodyX, bodyY + index * 24, 13, "#5a482e", bodyWidth, 18, "left", "600");
+  });
+  if (step.hint) {
+    drawText(step.hint, bodyX, TUTORIAL_PANEL_Y + 142, 10, "#7a633f", "left", "700");
+  }
   drawTutorialPreview();
 }
 
@@ -2513,57 +2652,6 @@ function drawPolygon(points, fill, edge, lineWidth = 1.5) {
   ctx.strokeStyle = edge;
   ctx.lineWidth = lineWidth;
   ctx.stroke();
-}
-
-function drawCompositeDnaHex(player, x, y, compact = false, scale = 1) {
-  if (!player || player.modules.length === 0) return;
-
-  const halfWidth = (compact ? 13 : 18) * scale;
-  const band = (compact ? 7 : 10) * scale;
-  const seam = "#f4ead1";
-  const connectorDepth = (compact ? 3 : 4.5) * scale;
-  const top = { x, y: y - band * 2 };
-  const upperRight = { x: x + halfWidth, y: y - band };
-  const lowerRight = { x: x + halfWidth, y: y + band };
-  const bottom = { x, y: y + band * 2 };
-  const lowerLeft = { x: x - halfWidth, y: y + band };
-  const upperLeft = { x: x - halfWidth, y: y - band };
-  const center = { x, y };
-
-  const pieces = [
-    {
-      moduleId: player.modules[0],
-      points: [top, upperRight, center, upperLeft],
-      connectors: [0, -1, 1, 0],
-      label: { x, y: y - band },
-    },
-    {
-      moduleId: player.modules[1],
-      points: [upperLeft, center, bottom, lowerLeft],
-      connectors: [-1, 1, 0, 0],
-      label: { x: x - halfWidth / 2, y: y + band / 2 },
-    },
-    {
-      moduleId: player.modules[2],
-      points: [center, upperRight, lowerRight, bottom],
-      connectors: [1, 0, 0, -1],
-      label: { x: x + halfWidth / 2, y: y + band / 2 },
-    },
-  ];
-
-  pieces.forEach((piece) => {
-    if (!piece.moduleId) return;
-    const definition = moduleDef(piece.moduleId);
-    drawPuzzlePiece(piece.points, piece.connectors, MODULE_TYPE_COLORS[definition.type], seam, compact ? 1.2 : 1.5, connectorDepth);
-
-    const abbreviation = definition.name
-      .split(" ")
-      .map((word) => word[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase();
-    drawText(abbreviation, piece.label.x, piece.label.y, (compact ? 7 : 9) * scale, "#fff8ea", "center", "700");
-  });
 }
 
 function drawButton(button) {
@@ -2763,7 +2851,7 @@ function drawCompactScoreboard() {
 
   const dnaIconX = PANEL_X + 42;
   const dnaIconY = 137;
-  drawCompositeDnaHex(player, dnaIconX, dnaIconY, true, 1.44);
+  drawDnaSeed(player, dnaIconX, dnaIconY, true, 1.44);
   drawText("DNA", dnaIconX, 173, 10, "#4a371e", "center", "700");
 
   let moduleTextY = 118;
@@ -2849,7 +2937,7 @@ function drawMessageBar() {
     const top = getTopOccupant(game.hoverCell);
     const summary = top
       ? `${terrainData(game.hoverCell).label} | top ${playerName(top.ownerId)} h${top.height} | stack ${game.hoverCell.occupants.length}`
-      : `${terrainData(game.hoverCell).label} | empty column`;
+      : `${terrainData(game.hoverCell).label} | empty garden space`;
     drawText(summary, WIDTH - 12, MESSAGE_Y + MESSAGE_H / 2, 11, "#f7f0df", "right", "500");
   }
 
@@ -2891,12 +2979,12 @@ function drawExitPromptOverlay() {
 function drawMenu() {
   drawBackground();
   drawText("Growing Seeds", WIDTH / 2, 54, 32, "#3c2b1a", "center", "700");
-  drawText("Build a 3-module plant and finish a playtest game in about 45 minutes.", WIDTH / 2, 82, 14, "#5c4a31", "center", "500");
+  drawText(`Build a ${TERMS.seed} and finish a playtest game in about 45 minutes.`, WIDTH / 2, 82, 14, "#5c4a31", "center", "500");
 
-  drawText("Choose Your DNA Set", WIDTH / 2, 104, 18, "#4d6f28", "center", "700");
+  drawText("Choose Your DNA Module Set", WIDTH / 2, 104, 18, "#4d6f28", "center", "700");
   drawText("Starter Set is the default learning mode. Advanced Set samples 12 from the 24-module pool.", WIDTH / 2, 156, 11, "#5d4a2f", "center", "500");
   drawText("Player Count", WIDTH / 2, 164, 14, "#4a371e", "center", "700");
-  drawText("Draft 3 DNA modules per player before planting your first seed.", WIDTH / 2, 278, 11, "#5d4a2f", "center", "500");
+  drawText(`Choose 3 ${TERMS.modulePlural} before planting your first ${TERMS.seed}.`, WIDTH / 2, 278, 11, "#5d4a2f", "center", "500");
 
   drawText("Saved Names", 688, 216, 12, "#4a371e", "center", "700");
   game.savedPlayerNames.forEach((name, index) => {
@@ -2944,7 +3032,7 @@ function drawNameEditorScreen() {
 function drawDraftScreen() {
   drawBackground();
   drawText("DNA Draft", 20, 28, 28, "#3c2b1a", "left", "700");
-  drawText(`${currentPlayer().name}: pick module ${currentPlayer().modules.length + 1} of 3`, 20, 50, 13, currentPlayer().color, "left", "700");
+  drawText(`${currentPlayer().name}: choose ${TERMS.moduleSingle} ${currentPlayer().modules.length + 1} of 3`, 20, 50, 13, currentPlayer().color, "left", "700");
   drawText(game.gameMode === GAME_MODES.starter ? "Starter Set: all 12 starter modules are available." : "Advanced Set: 12 modules sampled from the 24-module pool.", 20, 64, 11, "#5d4a2f", "left", "500");
 
   ctx.fillStyle = "rgba(255, 249, 236, 0.7)";
@@ -2959,8 +3047,8 @@ function drawDraftScreen() {
   ctx.lineWidth = 2;
   ctx.strokeRect(PANEL_X, 48, PANEL_W, 192);
 
-  drawText("Current DNA Cluster", PANEL_X + 12, 64, 12, "#4a371e", "left", "700");
-  drawCompositeDnaHex(currentPlayer(), PANEL_X + 66, 90);
+  drawText(`Current ${TERMS.seed}`, PANEL_X + 12, 64, 12, "#4a371e", "left", "700");
+  drawDnaSeed(currentPlayer(), PANEL_X + 66, 90);
 
   currentPlayer().modules.forEach((moduleId, index) => {
     const definition = moduleDef(moduleId);
