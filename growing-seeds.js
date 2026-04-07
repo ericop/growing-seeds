@@ -37,14 +37,14 @@ const NAME_INPUT_X = 274;
 const NAME_INPUT_W = 344;
 const NAME_INPUT_Y_INSET = 2;
 const NAME_INPUT_H = 22;
-const TUTORIAL_PANEL_X = 150;
-const TUTORIAL_PANEL_Y = 66;
-const TUTORIAL_PANEL_W = 500;
-const TUTORIAL_PANEL_H = 164;
-const TUTORIAL_PREVIEW_X = 176;
-const TUTORIAL_PREVIEW_Y = 96;
-const TUTORIAL_PREVIEW_W = 132;
-const TUTORIAL_PREVIEW_H = 82;
+const TUTORIAL_PANEL_X = 60;
+const TUTORIAL_PANEL_Y = 34;
+const TUTORIAL_PANEL_W = 680;
+const TUTORIAL_PANEL_H = 214;
+const TUTORIAL_PREVIEW_X = 86;
+const TUTORIAL_PREVIEW_Y = 74;
+const TUTORIAL_PREVIEW_W = 264;
+const TUTORIAL_PREVIEW_H = 164;
 
 const ACTIONS = {
   plant: "plant",
@@ -1681,23 +1681,23 @@ function refreshButtons() {
   const fullButton = makeButton(752, 10, 28, 22, "", "fullscreen", fullscreenSupported());
 
   if (game.tutorialOpen) {
-    buttons.push(makeButton(TUTORIAL_PANEL_X + 22, TUTORIAL_PANEL_Y + 122, 108, 28, "Back", "tutorialBack", game.tutorialStep > 0));
-    buttons.push(makeButton(TUTORIAL_PANEL_X + 186, TUTORIAL_PANEL_Y + 122, 128, 28, game.tutorialStep === TUTORIAL_STEPS.length - 1 ? "Done" : "Next", "tutorialNext"));
-    buttons.push(makeButton(TUTORIAL_PANEL_X + 390, TUTORIAL_PANEL_Y + 14, 84, 24, "Close", "tutorialClose"));
+    buttons.push(makeButton(TUTORIAL_PANEL_X + 24, TUTORIAL_PANEL_Y + 172, 118, 30, "Back", "tutorialBack", game.tutorialStep > 0));
+    buttons.push(makeButton(TUTORIAL_PANEL_X + 172, TUTORIAL_PANEL_Y + 172, 132, 30, game.tutorialStep === TUTORIAL_STEPS.length - 1 ? "Done" : "Next", "tutorialNext"));
+    buttons.push(makeButton(TUTORIAL_PANEL_X + 572, TUTORIAL_PANEL_Y + 16, 84, 24, "Close", "tutorialClose"));
     game.uiButtons = buttons;
     return;
   }
 
   if (game.screen === "menu") {
     buttons.push(fullButton);
-    buttons.push(makeButton(164, 118, 146, 32, "Starter Set", "mode:starter", true, game.gameMode === GAME_MODES.starter, "simple"));
-    buttons.push(makeButton(326, 118, 146, 32, "Advanced Set", "mode:advanced", true, game.gameMode === GAME_MODES.advanced, "draft 12/24"));
+    buttons.push(makeButton(164, 94, 146, 32, "Starter Set", "mode:starter", true, game.gameMode === GAME_MODES.starter, "simple"));
+    buttons.push(makeButton(326, 94, 146, 32, "Advanced Set", "mode:advanced", true, game.gameMode === GAME_MODES.advanced, "draft 12/24"));
 
     [2, 3, 4, 5].forEach((count, index) => {
       buttons.push(makeButton(182 + index * 108, 174, 88, 34, `${count} Players`, `players:${count}`, true, game.playerCount === count));
     });
 
-    buttons.push(makeButton(614, 126, 148, 34, "How to Play", "openTutorial"));
+    buttons.push(makeButton(614, 100, 148, 34, "How to Play", "openTutorial"));
     buttons.push(makeButton(614, 174, 148, 34, "Change Names", "openNames"));
     buttons.push(makeButton(300, 222, 200, 38, "Begin DNA Draft", "beginDraft"));
   }
@@ -2333,6 +2333,8 @@ function currentTutorialStep() {
 
 function drawTutorialPreview() {
   const step = currentTutorialStep();
+  const previewScaleX = TUTORIAL_PREVIEW_W / 132;
+  const previewScaleY = TUTORIAL_PREVIEW_H / 82;
 
   ctx.fillStyle = "rgba(255, 252, 244, 0.98)";
   ctx.fillRect(TUTORIAL_PREVIEW_X, TUTORIAL_PREVIEW_Y, TUTORIAL_PREVIEW_W, TUTORIAL_PREVIEW_H);
@@ -2340,15 +2342,20 @@ function drawTutorialPreview() {
   ctx.lineWidth = 2;
   ctx.strokeRect(TUTORIAL_PREVIEW_X, TUTORIAL_PREVIEW_Y, TUTORIAL_PREVIEW_W, TUTORIAL_PREVIEW_H);
 
+  ctx.save();
+  ctx.translate(TUTORIAL_PREVIEW_X, TUTORIAL_PREVIEW_Y);
+  ctx.scale(previewScaleX, previewScaleY);
+
   if (step.preview === "goal") {
-    drawDnaSeed(tutorialPreviewPlayer(), TUTORIAL_PREVIEW_X + 34, TUTORIAL_PREVIEW_Y + 34, true, 1.1);
-    pathHex(TUTORIAL_PREVIEW_X + 92, TUTORIAL_PREVIEW_Y + 46, 12);
+    drawDnaSeed(tutorialPreviewPlayer(), 34, 34, true, 1.1);
+    pathHex(92, 46, 12);
     ctx.fillStyle = "rgba(198, 220, 139, 0.95)";
     ctx.fill();
     ctx.strokeStyle = "#6f8e2d";
     ctx.lineWidth = 2;
     ctx.stroke();
-    drawText("VP", TUTORIAL_PREVIEW_X + 92, TUTORIAL_PREVIEW_Y + 46, 9, "#4a371e", "center", "700");
+    drawText("VP", 92, 46, 9, "#4a371e", "center", "700");
+    ctx.restore();
     return;
   }
 
@@ -2356,8 +2363,8 @@ function drawTutorialPreview() {
     MODULE_TYPE_LEGEND.forEach((entry, index) => {
       const row = index % 2;
       const col = Math.floor(index / 2);
-      const chipX = TUTORIAL_PREVIEW_X + 10 + col * 62;
-      const chipY = TUTORIAL_PREVIEW_Y + 12 + row * 30;
+      const chipX = 10 + col * 62;
+      const chipY = 12 + row * 30;
 
       ctx.fillStyle = MODULE_TYPE_COLORS[entry.type];
       ctx.fillRect(chipX, chipY, 54, 18);
@@ -2367,6 +2374,7 @@ function drawTutorialPreview() {
       drawText(entry.label, chipX + 27, chipY + 9, 7, "#fff8ea", "center", "700");
       drawText(entry.text, chipX + 27, chipY + 24, 6, "#5a482e", "center", "500");
     });
+    ctx.restore();
     return;
   }
 
@@ -2374,8 +2382,8 @@ function drawTutorialPreview() {
     const sampleModules = ["branchSplitter", "tallStalk", "doubleSeedPod"];
     sampleModules.forEach((moduleId, index) => {
       const fill = MODULE_TYPE_COLORS[moduleDef(moduleId).type];
-      const tileX = TUTORIAL_PREVIEW_X + 8 + index * 20;
-      const tileY = TUTORIAL_PREVIEW_Y + 14 + (index % 2) * 16;
+      const tileX = 8 + index * 20;
+      const tileY = 14 + (index % 2) * 16;
       ctx.fillStyle = fill;
       ctx.fillRect(tileX, tileY, 22, 14);
       ctx.strokeStyle = "#f4ead1";
@@ -2383,24 +2391,25 @@ function drawTutorialPreview() {
       ctx.strokeRect(tileX, tileY, 22, 14);
     });
     ctx.beginPath();
-    ctx.moveTo(TUTORIAL_PREVIEW_X + 54, TUTORIAL_PREVIEW_Y + 34);
-    ctx.lineTo(TUTORIAL_PREVIEW_X + 74, TUTORIAL_PREVIEW_Y + 34);
-    ctx.lineTo(TUTORIAL_PREVIEW_X + 68, TUTORIAL_PREVIEW_Y + 28);
-    ctx.moveTo(TUTORIAL_PREVIEW_X + 74, TUTORIAL_PREVIEW_Y + 34);
-    ctx.lineTo(TUTORIAL_PREVIEW_X + 68, TUTORIAL_PREVIEW_Y + 40);
+    ctx.moveTo(54, 34);
+    ctx.lineTo(74, 34);
+    ctx.lineTo(68, 28);
+    ctx.moveTo(74, 34);
+    ctx.lineTo(68, 40);
     ctx.strokeStyle = "#d4a332";
     ctx.lineWidth = 2;
     ctx.stroke();
-    drawDnaSeed(tutorialPreviewPlayer(), TUTORIAL_PREVIEW_X + 98, TUTORIAL_PREVIEW_Y + 38, true, 1.12);
-    drawText(TERMS.seed, TUTORIAL_PREVIEW_X + 98, TUTORIAL_PREVIEW_Y + 66, 8, "#4a371e", "center", "700");
+    drawDnaSeed(tutorialPreviewPlayer(), 98, 38, true, 1.12);
+    drawText(TERMS.seed, 98, 66, 8, "#4a371e", "center", "700");
+    ctx.restore();
     return;
   }
 
   if (step.preview === "plant") {
     [
-      { x: TUTORIAL_PREVIEW_X + 34, y: TUTORIAL_PREVIEW_Y + 30 },
-      { x: TUTORIAL_PREVIEW_X + 56, y: TUTORIAL_PREVIEW_Y + 42 },
-      { x: TUTORIAL_PREVIEW_X + 78, y: TUTORIAL_PREVIEW_Y + 30 },
+      { x: 34, y: 30 },
+      { x: 56, y: 42 },
+      { x: 78, y: 30 },
     ].forEach((cell) => {
       pathHex(cell.x, cell.y, 11);
       ctx.fillStyle = "rgba(255, 249, 236, 0.95)";
@@ -2409,20 +2418,21 @@ function drawTutorialPreview() {
       ctx.lineWidth = 1.8;
       ctx.stroke();
     });
-    drawDnaSeed(tutorialPreviewPlayer(), TUTORIAL_PREVIEW_X + 90, TUTORIAL_PREVIEW_Y + 46, true, 0.92);
+    drawDnaSeed(tutorialPreviewPlayer(), 90, 46, true, 0.92);
     ctx.strokeStyle = "#4f7f37";
     ctx.lineWidth = 2;
-    ctx.strokeRect(TUTORIAL_PREVIEW_X + 16, TUTORIAL_PREVIEW_Y + 58, 100, 16);
-    drawText("Plant Seed", TUTORIAL_PREVIEW_X + 66, TUTORIAL_PREVIEW_Y + 66, 8, "#4f7f37", "center", "700");
+    ctx.strokeRect(16, 58, 100, 16);
+    drawText("Plant Seed", 66, 66, 8, "#4f7f37", "center", "700");
+    ctx.restore();
     return;
   }
 
   if (step.preview === "growth") {
     [
-      { x: TUTORIAL_PREVIEW_X + 26, y: TUTORIAL_PREVIEW_Y + 44 },
-      { x: TUTORIAL_PREVIEW_X + 48, y: TUTORIAL_PREVIEW_Y + 56 },
-      { x: TUTORIAL_PREVIEW_X + 70, y: TUTORIAL_PREVIEW_Y + 44 },
-      { x: TUTORIAL_PREVIEW_X + 92, y: TUTORIAL_PREVIEW_Y + 56 },
+      { x: 26, y: 44 },
+      { x: 48, y: 56 },
+      { x: 70, y: 44 },
+      { x: 92, y: 56 },
     ].forEach((cell, index) => {
       pathHex(cell.x, cell.y, 10);
       ctx.fillStyle = index < 3 ? "rgba(79, 127, 55, 0.22)" : "rgba(255, 249, 236, 0.95)";
@@ -2432,30 +2442,32 @@ function drawTutorialPreview() {
       ctx.stroke();
     });
     ctx.beginPath();
-    ctx.moveTo(TUTORIAL_PREVIEW_X + 76, TUTORIAL_PREVIEW_Y + 50);
-    ctx.lineTo(TUTORIAL_PREVIEW_X + 90, TUTORIAL_PREVIEW_Y + 56);
-    ctx.lineTo(TUTORIAL_PREVIEW_X + 83, TUTORIAL_PREVIEW_Y + 48);
-    ctx.moveTo(TUTORIAL_PREVIEW_X + 90, TUTORIAL_PREVIEW_Y + 56);
-    ctx.lineTo(TUTORIAL_PREVIEW_X + 81, TUTORIAL_PREVIEW_Y + 58);
+    ctx.moveTo(76, 50);
+    ctx.lineTo(90, 56);
+    ctx.lineTo(83, 48);
+    ctx.moveTo(90, 56);
+    ctx.lineTo(81, 58);
     ctx.strokeStyle = "#d4a332";
     ctx.lineWidth = 2.2;
     ctx.stroke();
-    drawText("Grow", TUTORIAL_PREVIEW_X + 34, TUTORIAL_PREVIEW_Y + 20, 9, "#4f7f37", "left", "700");
+    drawText("Grow", 34, 20, 9, "#4f7f37", "left", "700");
+    ctx.restore();
     return;
   }
 
   ctx.fillStyle = "rgba(68, 123, 42, 0.12)";
-  ctx.fillRect(TUTORIAL_PREVIEW_X + 16, TUTORIAL_PREVIEW_Y + 18, 100, 18);
-  drawText("Produce 6", TUTORIAL_PREVIEW_X + 66, TUTORIAL_PREVIEW_Y + 27, 10, "#4d3a24", "center", "700");
-  drawText("Score 12", TUTORIAL_PREVIEW_X + 66, TUTORIAL_PREVIEW_Y + 45, 10, "#4d3a24", "center", "700");
-  drawText("Highest score wins", TUTORIAL_PREVIEW_X + 66, TUTORIAL_PREVIEW_Y + 63, 8, "#5d4a2f", "center", "600");
+  ctx.fillRect(16, 18, 100, 18);
+  drawText("Produce 6", 66, 27, 10, "#4d3a24", "center", "700");
+  drawText("Score 12", 66, 45, 10, "#4d3a24", "center", "700");
+  drawText("Highest score wins", 66, 63, 8, "#5d4a2f", "center", "600");
+  ctx.restore();
 }
 
 function drawTutorialOverlay() {
   const step = currentTutorialStep();
-  const bodyX = TUTORIAL_PANEL_X + 176;
-  const bodyY = TUTORIAL_PANEL_Y + 74;
-  const bodyWidth = 288;
+  const bodyX = TUTORIAL_PANEL_X + 322;
+  const bodyY = TUTORIAL_PANEL_Y + 78;
+  const bodyWidth = 360;
 
   ctx.fillStyle = "rgba(18, 13, 8, 0.74)";
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
@@ -2484,13 +2496,13 @@ function drawTutorialOverlay() {
   ctx.lineWidth = 3;
   ctx.strokeRect(TUTORIAL_PANEL_X, TUTORIAL_PANEL_Y, TUTORIAL_PANEL_W, TUTORIAL_PANEL_H);
 
-  drawText(`How to Play  ${game.tutorialStep + 1}/${TUTORIAL_STEPS.length}`, WIDTH / 2, TUTORIAL_PANEL_Y + 24, 14, "#4a371e", "center", "700");
-  drawText(step.title, bodyX, TUTORIAL_PANEL_Y + 48, 22, "#3c2b1a", "left", "700");
+  drawText(`How to Play  ${game.tutorialStep + 1}/${TUTORIAL_STEPS.length}`, WIDTH / 2, TUTORIAL_PANEL_Y + 28, 16, "#4a371e", "center", "700");
+  drawText(step.title, bodyX, TUTORIAL_PANEL_Y + 56, 24, "#3c2b1a", "left", "700");
   step.lines.forEach((line, index) => {
-    drawWrappedText(line, bodyX, bodyY + index * 24, 13, "#5a482e", bodyWidth, 18, "left", "600");
+    drawWrappedText(line, bodyX, bodyY + index * 28, 14, "#5a482e", bodyWidth, 20, "left", "600");
   });
   if (step.hint) {
-    drawText(step.hint, bodyX, TUTORIAL_PANEL_Y + 142, 10, "#7a633f", "left", "700");
+    drawText(step.hint, bodyX, TUTORIAL_PANEL_Y + 176, 11, "#7a633f", "left", "700");
   }
   drawTutorialPreview();
 }
