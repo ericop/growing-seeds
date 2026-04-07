@@ -1,5 +1,30 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
+const nameEditorInput = document.createElement("input");
+
+nameEditorInput.type = "text";
+nameEditorInput.maxLength = 16;
+nameEditorInput.autocomplete = "off";
+nameEditorInput.autocorrect = "off";
+nameEditorInput.autocapitalize = "words";
+nameEditorInput.spellcheck = false;
+nameEditorInput.inputMode = "text";
+nameEditorInput.setAttribute("aria-label", "Player name");
+Object.assign(nameEditorInput.style, {
+  position: "fixed",
+  top: "0",
+  left: "0",
+  width: "1px",
+  height: "1px",
+  padding: "0",
+  border: "0",
+  opacity: "0.01",
+  pointerEvents: "none",
+  background: "transparent",
+  color: "transparent",
+  caretColor: "transparent",
+});
+document.body.appendChild(nameEditorInput);
 
 // ------------------------------------------------------------
 // Config
@@ -422,8 +447,12 @@ function terrainData(cell) {
   return TERRAINS[cell.terrain];
 }
 
+function fullscreenElement() {
+  return document.fullscreenElement || document.webkitFullscreenElement || null;
+}
+
 function isFullscreenActive() {
-  return document.fullscreenElement === canvas || document.webkitFullscreenElement === canvas;
+  return Boolean(fullscreenElement());
 }
 
 function fullscreenSupported() {
@@ -458,15 +487,22 @@ function toggleFullscreen() {
   }
 
   if (isFullscreenActive()) {
-    if (document.exitFullscreen) {
-      document.exitFullscreen();
-    } else if (document.webkitExitFullscreen) {
-      document.webkitExitFullscreen();
+    const exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen;
+    if (exitFullscreen) {
+      const result = exitFullscreen.call(document);
+      if (result && typeof result.catch === "function") {
+        result.catch(() => {
+          game.message = "Could not exit fullscreen.";
+        });
+      }
+    } else {
+      game.message = "Fullscreen exit is not available in this browser.";
     }
     return;
   }
 
-  if (canvas.requestFullscreen) {
+  const requestFullscreen = canvas.requestFullscreen || canvas.webkitRequestFullscreen;
+  if (requestFullscreen === canvas.requestFullscreen) {
     try {
       const request = canvas.requestFullscreen({ navigationUI: "hide" });
       if (request && typeof request.catch === "function") {
@@ -482,10 +518,95 @@ function toggleFullscreen() {
         });
       }
     }
-  } else if (canvas.webkitRequestFullscreen) {
-    canvas.webkitRequestFullscreen();
+  } else if (requestFullscreen) {
+    requestFullscreen.call(canvas);
   }
 }
+
+function syncNameEditorInput(shouldFocus = false) {
+  if (game.screen !== "names") {
+    if (document.activeElement === nameEditorInput) {
+      nameEditorInput.blur();
+    }
+    return;
+  }
+
+  const value = game.nameEditorNames[game.editingNameIndex] || "";
+  if (nameEditorInput.value !== value) {
+    nameEditorInput.value = value;
+  }
+
+  if (shouldFocus) {
+    try {
+      nameEditorInput.focus({ preventScroll: true });
+    } catch (error) {
+      nameEditorInput.focus();
+    }
+    if (typeof nameEditorInput.setSelectionRange === "function") {
+      const caret = nameEditorInput.value.length;
+      nameEditorInput.setSelectionRange(caret, caret);
+    }
+  }
+}
+
+function activateNameField(index, shouldFocus = true) {
+  game.editingNameIndex = clamp(index, 0, 4);
+  syncNameEditorInput(shouldFocus);
+  game.message = `Editing ${game.savedPlayerNames[game.editingNameIndex] || `Player ${game.editingNameIndex + 1}`}. Type a name and press Save Names when ready.`;
+}
+
+function saveEditedPlayerNames() {
+  const defaults = defaultPlayerNames();
+  game.savedPlayerNames = defaults.map((fallback, index) => {
+    const value = (game.nameEditorNames[index] || "").trim();
+    return value || fallback;
+  });
+  savePlayerNamesToStorage(game.savedPlayerNames);
+  game.screen = "menu";
+  game.nameEditorNames = [];
+  nameEditorInput.value = "";
+  syncNameEditorInput(false);
+  game.message = "Player names saved to local storage.";
+}
+
+function cancelEditedPlayerNames() {
+  game.screen = "menu";
+  game.nameEditorNames = [];
+  nameEditorInput.value = "";
+  syncNameEditorInput(false);
+  game.message = "Player names unchanged.";
+}
+
+nameEditorInput.addEventListener("input", () => {
+  if (game.screen !== "names") return;
+
+  const nextValue = nameEditorInput.value.slice(0, 16);
+  game.nameEditorNames[game.editingNameIndex] = nextValue;
+  if (nameEditorInput.value !== nextValue) {
+    nameEditorInput.value = nextValue;
+  }
+});
+
+nameEditorInput.addEventListener("keydown", (event) => {
+  if (game.screen !== "names") return;
+
+  if (event.key === "Tab") {
+    event.preventDefault();
+    activateNameField((game.editingNameIndex + (event.shiftKey ? 4 : 1)) % 5);
+    return;
+  }
+
+  if (event.key === "Enter") {
+    event.preventDefault();
+    saveEditedPlayerNames();
+    return;
+  }
+
+  if (event.key === "Escape") {
+    event.preventDefault();
+    cancelEditedPlayerNames();
+  }
+});
 
 function sortByBoardOrder(cells) {
   return [...cells].sort((a, b) => (a.r - b.r) || (a.q - b.q));
@@ -1485,41 +1606,30 @@ function handleButton(button) {
   if (button.action === "openNames") {
     game.screen = "names";
     game.nameEditorNames = [...game.savedPlayerNames];
-    game.editingNameIndex = 0;
+    activateNameField(0);
     game.message = "Select a player row, type a name, then save it to this browser.";
     return;
   }
 
   if (button.action === "cancelNames") {
-    game.screen = "menu";
-    game.nameEditorNames = [];
-    game.message = "Player names unchanged.";
+    cancelEditedPlayerNames();
     return;
   }
 
   if (button.action === "resetNames") {
     game.nameEditorNames = defaultPlayerNames();
-    game.editingNameIndex = 0;
+    activateNameField(0);
     game.message = "Names reset to the default player labels.";
     return;
   }
 
   if (button.action === "saveNames") {
-    const defaults = defaultPlayerNames();
-    game.savedPlayerNames = defaults.map((fallback, index) => {
-      const value = (game.nameEditorNames[index] || "").trim();
-      return value || fallback;
-    });
-    savePlayerNamesToStorage(game.savedPlayerNames);
-    game.screen = "menu";
-    game.nameEditorNames = [];
-    game.message = "Player names saved to local storage.";
+    saveEditedPlayerNames();
     return;
   }
 
   if (button.action.startsWith("nameField:")) {
-    game.editingNameIndex = Number(button.action.split(":")[1]);
-    game.message = `Editing ${game.savedPlayerNames[game.editingNameIndex] || `Player ${game.editingNameIndex + 1}`}. Type a name and press Save Names when ready.`;
+    activateNameField(Number(button.action.split(":")[1]));
     return;
   }
 
@@ -1672,6 +1782,10 @@ canvas.addEventListener("pointerdown", (event) => {
 });
 
 window.addEventListener("keydown", (event) => {
+  if (game.screen === "names" && document.activeElement === nameEditorInput) {
+    return;
+  }
+
   if (event.key.toLowerCase() === "f") {
     toggleFullscreen();
     return;
@@ -1692,42 +1806,35 @@ window.addEventListener("keydown", (event) => {
 
     if (event.key === "Tab") {
       event.preventDefault();
-      game.editingNameIndex = (game.editingNameIndex + (event.shiftKey ? 4 : 1)) % 5;
+      activateNameField((game.editingNameIndex + (event.shiftKey ? 4 : 1)) % 5, false);
       return;
     }
 
     if (event.key === "Enter") {
-      const defaults = defaultPlayerNames();
-      game.savedPlayerNames = defaults.map((fallback, index) => {
-        const value = (game.nameEditorNames[index] || "").trim();
-        return value || fallback;
-      });
-      savePlayerNamesToStorage(game.savedPlayerNames);
-      game.screen = "menu";
-      game.nameEditorNames = [];
-      game.message = "Player names saved to local storage.";
+      saveEditedPlayerNames();
       return;
     }
 
     if (event.key === "Escape") {
-      game.screen = "menu";
-      game.nameEditorNames = [];
-      game.message = "Player names unchanged.";
+      cancelEditedPlayerNames();
       return;
     }
 
     if (event.key === "Backspace") {
       game.nameEditorNames[game.editingNameIndex] = currentValue.slice(0, -1);
+      syncNameEditorInput(false);
       return;
     }
 
     if (event.key === "Delete") {
       game.nameEditorNames[game.editingNameIndex] = "";
+      syncNameEditorInput(false);
       return;
     }
 
     if (event.key.length === 1 && currentValue.length < 16) {
       game.nameEditorNames[game.editingNameIndex] = `${currentValue}${event.key}`;
+      syncNameEditorInput(false);
     }
     return;
   }
@@ -1985,25 +2092,44 @@ function drawFullscreenIcon(button, enabled, hovered) {
   const top = button.y + pad;
   const bottom = button.y + button.h - pad;
   const inset = 4;
+  const active = isFullscreenActive();
 
   ctx.strokeStyle = iconColor;
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(left + inset, top);
-  ctx.lineTo(left, top);
-  ctx.lineTo(left, top + inset);
+  if (active) {
+    ctx.moveTo(left, top + inset);
+    ctx.lineTo(left + inset, top + inset);
+    ctx.lineTo(left + inset, top);
 
-  ctx.moveTo(right - inset, top);
-  ctx.lineTo(right, top);
-  ctx.lineTo(right, top + inset);
+    ctx.moveTo(right - inset, top);
+    ctx.lineTo(right - inset, top + inset);
+    ctx.lineTo(right, top + inset);
 
-  ctx.moveTo(left, bottom - inset);
-  ctx.lineTo(left, bottom);
-  ctx.lineTo(left + inset, bottom);
+    ctx.moveTo(left, bottom - inset);
+    ctx.lineTo(left + inset, bottom - inset);
+    ctx.lineTo(left + inset, bottom);
 
-  ctx.moveTo(right - inset, bottom);
-  ctx.lineTo(right, bottom);
-  ctx.lineTo(right, bottom - inset);
+    ctx.moveTo(right - inset, bottom);
+    ctx.lineTo(right - inset, bottom - inset);
+    ctx.lineTo(right, bottom - inset);
+  } else {
+    ctx.moveTo(left + inset, top);
+    ctx.lineTo(left, top);
+    ctx.lineTo(left, top + inset);
+
+    ctx.moveTo(right - inset, top);
+    ctx.lineTo(right, top);
+    ctx.lineTo(right, top + inset);
+
+    ctx.moveTo(left, bottom - inset);
+    ctx.lineTo(left, bottom);
+    ctx.lineTo(left + inset, bottom);
+
+    ctx.moveTo(right - inset, bottom);
+    ctx.lineTo(right, bottom);
+    ctx.lineTo(right, bottom - inset);
+  }
   ctx.stroke();
 }
 
