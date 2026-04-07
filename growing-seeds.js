@@ -40,7 +40,7 @@ const NAME_INPUT_H = 22;
 const TUTORIAL_PANEL_X = 60;
 const TUTORIAL_PANEL_Y = 34;
 const TUTORIAL_PANEL_W = 680;
-const TUTORIAL_PANEL_H = 214;
+const TUTORIAL_PANEL_H = 246;
 const TUTORIAL_PREVIEW_X = 86;
 const TUTORIAL_PREVIEW_Y = 74;
 const TUTORIAL_PREVIEW_W = 264;
@@ -1681,8 +1681,8 @@ function refreshButtons() {
   const fullButton = makeButton(752, 10, 28, 22, "", "fullscreen", fullscreenSupported());
 
   if (game.tutorialOpen) {
-    buttons.push(makeButton(TUTORIAL_PANEL_X + 24, TUTORIAL_PANEL_Y + 172, 118, 30, "Back", "tutorialBack", game.tutorialStep > 0));
-    buttons.push(makeButton(TUTORIAL_PANEL_X + 172, TUTORIAL_PANEL_Y + 172, 132, 30, game.tutorialStep === TUTORIAL_STEPS.length - 1 ? "Done" : "Next", "tutorialNext"));
+    buttons.push(makeButton(TUTORIAL_PANEL_X + 20, TUTORIAL_PANEL_Y + 208, 92, 26, "Back", "tutorialBack", game.tutorialStep > 0));
+    buttons.push(makeButton(TUTORIAL_PANEL_X + TUTORIAL_PANEL_W - 116, TUTORIAL_PANEL_Y + 208, 96, 26, game.tutorialStep === TUTORIAL_STEPS.length - 1 ? "Done" : "Next", "tutorialNext"));
     buttons.push(makeButton(TUTORIAL_PANEL_X + 572, TUTORIAL_PANEL_Y + 16, 84, 24, "Close", "tutorialClose"));
     game.uiButtons = buttons;
     return;
@@ -1690,16 +1690,16 @@ function refreshButtons() {
 
   if (game.screen === "menu") {
     buttons.push(fullButton);
-    buttons.push(makeButton(164, 94, 146, 32, "Starter Set", "mode:starter", true, game.gameMode === GAME_MODES.starter, "simple"));
-    buttons.push(makeButton(326, 94, 146, 32, "Advanced Set", "mode:advanced", true, game.gameMode === GAME_MODES.advanced, "draft 12/24"));
+    buttons.push(makeButton(164, 108, 146, 32, "Starter Set", "mode:starter", true, game.gameMode === GAME_MODES.starter, "simple"));
+    buttons.push(makeButton(326, 108, 146, 32, "Advanced Set", "mode:advanced", true, game.gameMode === GAME_MODES.advanced, "draft 12/24"));
 
     [2, 3, 4, 5].forEach((count, index) => {
-      buttons.push(makeButton(182 + index * 108, 174, 88, 34, `${count} Players`, `players:${count}`, true, game.playerCount === count));
+      buttons.push(makeButton(182 + index * 108, 188, 88, 34, `${count} Players`, `players:${count}`, true, game.playerCount === count));
     });
 
-    buttons.push(makeButton(614, 100, 148, 34, "How to Play", "openTutorial"));
-    buttons.push(makeButton(614, 174, 148, 34, "Change Names", "openNames"));
-    buttons.push(makeButton(300, 222, 200, 38, "Begin DNA Draft", "beginDraft"));
+    buttons.push(makeButton(614, 108, 148, 34, "How to Play", "openTutorial"));
+    buttons.push(makeButton(614, 188, 148, 34, "Change Names", "openNames"));
+    buttons.push(makeButton(300, 236, 200, 38, "Begin DNA Draft", "beginDraft"));
   }
 
   if (game.screen === "names") {
@@ -2363,16 +2363,16 @@ function drawTutorialPreview() {
     MODULE_TYPE_LEGEND.forEach((entry, index) => {
       const row = index % 2;
       const col = Math.floor(index / 2);
-      const chipX = 10 + col * 62;
-      const chipY = 12 + row * 30;
+      const chipX = 5 + col * 64;
+      const chipY = row === 0 ? 6 : 44;
 
       ctx.fillStyle = MODULE_TYPE_COLORS[entry.type];
-      ctx.fillRect(chipX, chipY, 54, 18);
+      ctx.fillRect(chipX, chipY, 58, 16);
       ctx.strokeStyle = "#f4ead1";
       ctx.lineWidth = 2;
-      ctx.strokeRect(chipX, chipY, 54, 18);
-      drawText(entry.label, chipX + 27, chipY + 9, 7, "#fff8ea", "center", "700");
-      drawText(entry.text, chipX + 27, chipY + 24, 6, "#5a482e", "center", "500");
+      ctx.strokeRect(chipX, chipY, 58, 16);
+      drawText(entry.label, chipX + 29, chipY + 8, 7, "#fff8ea", "center", "700");
+      drawWrappedText(entry.text, chipX + 29, chipY + 24, 5, "#5a482e", 58, 6, "center", "500");
     });
     ctx.restore();
     return;
@@ -2475,7 +2475,7 @@ function drawTutorialOverlay() {
   if (game.screen === "menu" && game.tutorialStep <= 1) {
     ctx.strokeStyle = "#d4a332";
     ctx.lineWidth = 3;
-    ctx.strokeRect(300, 222, 200, 38);
+    ctx.strokeRect(300, 236, 200, 38);
   }
 
   if (game.screen === "play" && step.preview === "plant") {
@@ -2498,8 +2498,10 @@ function drawTutorialOverlay() {
 
   drawText(`How to Play  ${game.tutorialStep + 1}/${TUTORIAL_STEPS.length}`, WIDTH / 2, TUTORIAL_PANEL_Y + 28, 16, "#4a371e", "center", "700");
   drawText(step.title, bodyX, TUTORIAL_PANEL_Y + 56, 24, "#3c2b1a", "left", "700");
-  step.lines.forEach((line, index) => {
-    drawWrappedText(line, bodyX, bodyY + index * 28, 14, "#5a482e", bodyWidth, 20, "left", "600");
+  let tutorialTextY = bodyY;
+  step.lines.forEach((line) => {
+    const lineCount = drawWrappedText(line, bodyX, tutorialTextY, 14, "#5a482e", bodyWidth, 20, "left", "600");
+    tutorialTextY += lineCount * 20 + 8;
   });
   if (step.hint) {
     drawText(step.hint, bodyX, TUTORIAL_PANEL_Y + 176, 11, "#7a633f", "left", "700");
@@ -2991,16 +2993,17 @@ function drawExitPromptOverlay() {
 function drawMenu() {
   drawBackground();
   drawText("Growing Seeds", WIDTH / 2, 54, 32, "#3c2b1a", "center", "700");
-  drawText(`Build a ${TERMS.seed} and finish a playtest game in about 45 minutes.`, WIDTH / 2, 82, 14, "#5c4a31", "center", "500");
+  drawText(`Build a ${TERMS.seed} and finish a playtest game in about 45 minutes.`, WIDTH / 2, 76, 14, "#5c4a31", "center", "500");
 
-  drawText("Choose Your DNA Module Set", WIDTH / 2, 104, 18, "#4d6f28", "center", "700");
-  drawText("Starter Set is the default learning mode. Advanced Set samples 12 from the 24-module pool.", WIDTH / 2, 156, 11, "#5d4a2f", "center", "500");
-  drawText("Player Count", WIDTH / 2, 164, 14, "#4a371e", "center", "700");
-  drawText(`Choose 3 ${TERMS.modulePlural} before planting your first ${TERMS.seed}.`, WIDTH / 2, 278, 11, "#5d4a2f", "center", "500");
+  drawText("Choose Your DNA Module Set", 78, 96, 18, "#4d6f28", "left", "700");
+  drawText("Starter Set is the default learning mode.", 78, 154, 11, "#5d4a2f", "left", "500");
+  drawText("Advanced Set samples 12 from the 24-module pool.", 78, 166, 11, "#5d4a2f", "left", "500");
+  drawText("Player Count", WIDTH / 2, 178, 14, "#4a371e", "center", "700");
+  drawText(`Choose 3 ${TERMS.modulePlural} before planting your first ${TERMS.seed}.`, WIDTH / 2, 292, 11, "#5d4a2f", "center", "500");
 
-  drawText("Saved Names", 688, 216, 12, "#4a371e", "center", "700");
+  drawText("Saved Names", 688, 230, 12, "#4a371e", "center", "700");
   game.savedPlayerNames.forEach((name, index) => {
-    drawText(`${index + 1}. ${name}`, 688, 230 + index * 10, 10, PLAYER_COLORS[index], "center", "600");
+    drawText(`${index + 1}. ${name}`, 688, 244 + index * 10, 10, PLAYER_COLORS[index], "center", "600");
   });
 
   game.uiButtons.forEach(drawButton);
