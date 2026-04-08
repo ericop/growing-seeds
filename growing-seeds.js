@@ -1753,19 +1753,19 @@ function refreshButtons() {
     const growPreview = calculateManualGrowPlan(player);
 
     if (game.exitPrompt.active) {
-      buttons.push(makeButton(16, 10, 82, 22, game.showScores ? "V Score" : "> Score", "toggleScores"));
+      buttons.push(makeButton(16, 10, 82, 22, game.showScores ? "⌄ Score" : "> Score", "toggleScores"));
       buttons.push(makeButton(638, 10, 108, 22, "Main Menu", "openExitPrompt"));
       buttons.push(fullButton);
       buttons.push(makeButton(252, 160, 140, 32, "Yes, exit", "confirmExit"));
       buttons.push(makeButton(408, 160, 140, 32, "No, resume game", "cancelExit"));
     } else if (game.passPrompt.active) {
-      buttons.push(makeButton(16, 10, 82, 22, game.showScores ? "V Score" : "> Score", "toggleScores"));
+      buttons.push(makeButton(16, 10, 82, 22, game.showScores ? "⌄ Score" : "> Score", "toggleScores"));
       buttons.push(makeButton(638, 10, 108, 22, "Main Menu", "openExitPrompt"));
       buttons.push(fullButton);
       buttons.push(makeButton(330, 152, 140, 34, "OK", "handoffOk"));
     } else {
       buttons.push(makeButton(638, 10, 108, 22, "Main Menu", "openExitPrompt"));
-      buttons.push(makeButton(16, 10, 82, 22, game.showScores ? "V Score" : "> Score", "toggleScores"));
+      buttons.push(makeButton(16, 10, 82, 22, game.showScores ? "⌄ Score" : "> Score", "toggleScores"));
       buttons.push(fullButton);
       buttons.push(makeButton(PANEL_X + 10, 184, 132, 22, mustPlant ? "Plant First Seed" : "Plant Seed", ACTIONS.plant, canPlant, game.selectedAction === ACTIONS.plant));
       buttons.push(makeButton(PANEL_X + 148, 184, 132, 22, `Grow x${growPreview.steps}`, ACTIONS.grow, !mustPlant && canGrow, game.selectedAction === ACTIONS.grow));
@@ -2896,7 +2896,7 @@ function drawScoreDrawer() {
 
   const panelX = 16;
   const panelY = 36;
-  const panelW = 132;
+  const panelW = 230;
   const panelH = 18 + game.players.length * 20;
 
   ctx.fillStyle = "rgba(255, 249, 236, 0.97)";
@@ -2910,7 +2910,7 @@ function drawScoreDrawer() {
     ctx.fillStyle = player.color;
     ctx.fillRect(panelX + 8, rowY - 5, 10, 10);
     drawText(player.name, panelX + 24, rowY - 1, 10, player.color, "left", "700");
-    drawText(`${player.produce}P ${player.score}VP`, panelX + 24, rowY + 9, 9, "#4b3922", "left", "600");
+    drawText(`${player.produce} Produce ${player.score} Victory Points`, panelX + 24, rowY + 9, 9, "#4b3922", "left", "600");
   });
 }
 
