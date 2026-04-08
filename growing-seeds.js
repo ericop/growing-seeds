@@ -2858,17 +2858,12 @@ function drawCompactScoreboard() {
   drawText(`Weather: ${currentWeather().label}`, PANEL_X + 122, 50, 12, "#5e4b2b");
   drawText(currentWeather().text, PANEL_X + 10, 66, 10, "#6d5a3d", "left", "500");
 
-  ctx.fillStyle = "rgba(68, 123, 42, 0.12)";
-  ctx.fillRect(PANEL_X + 10, 76, 270, 24);
-  drawText(`Current: ${player.name}`, PANEL_X + 16, 88, 13, player.color, "left", "700");
-  drawText(`Produce ${player.produce} | Score ${player.score}`, PANEL_X + 276, 88, 10, "#4d3a24", "right", "600");
-
   const dnaIconX = PANEL_X + 42;
-  const dnaIconY = 137;
+  const dnaIconY = 129;
   drawDnaSeed(player, dnaIconX, dnaIconY, true, 1.44);
-  drawText("DNA", dnaIconX, 173, 10, "#4a371e", "center", "700");
+  drawText("DNA", dnaIconX, 165, 10, "#4a371e", "center", "700");
 
-  let moduleTextY = 118;
+  let moduleTextY = 110;
   const moduleTextX = PANEL_X + 72;
   const moduleTextWidth = 204;
   const moduleLineHeight = 10;
@@ -2889,6 +2884,51 @@ function drawCompactScoreboard() {
     );
     moduleTextY += lineCount * moduleLineHeight + moduleBlockGap;
   });
+}
+
+function drawCurrentPlayerBadge() {
+  if (game.screen !== "play") return;
+
+  const player = currentPlayer();
+  const centerX = 88;
+  const radius = 36;
+  const centerY = LEGEND_Y - radius - 6;
+  const nameWidth = 58;
+  const nameSize = player.name.length > 12 ? 10 : 11;
+  let nameLines = wrapText(player.name, nameSize, nameWidth, "700");
+
+  if (nameLines.length > 2) {
+    nameLines = wrapText(`${player.name.slice(0, 15)}...`, 10, nameWidth, "700").slice(0, 2);
+  }
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255, 252, 244, 0.98)";
+  ctx.shadowColor = "rgba(55, 40, 21, 0.22)";
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 3;
+  ctx.fill();
+  ctx.shadowColor = "transparent";
+  ctx.strokeStyle = player.color;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, radius - 7, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+  ctx.fill();
+  ctx.restore();
+
+  drawText("Current", centerX, centerY - 20, 8, "#6a5738", "center", "700");
+
+  const nameStartY = centerY - 7 - (nameLines.length - 1) * 5;
+  nameLines.forEach((line, index) => {
+    drawText(line, centerX, nameStartY + index * 10, nameSize, player.color, "center", "700");
+  });
+
+  drawText(`Produce ${player.produce}`, centerX, centerY + 15, 8, "#4d3a24", "center", "600");
+  drawText(`Score ${player.score}`, centerX, centerY + 25, 8, "#4d3a24", "center", "600");
 }
 
 function drawScoreDrawer() {
@@ -3123,6 +3163,7 @@ function drawPlayScreen() {
   drawScoreDrawer();
   drawCompactScoreboard();
   drawLegendStrip();
+  drawCurrentPlayerBadge();
   game.uiButtons.forEach(drawButton);
   drawMessageBar();
   if (game.exitPrompt.active) {
